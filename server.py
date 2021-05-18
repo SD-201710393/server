@@ -17,6 +17,9 @@ def home():
     return json.dumps(out)
 
 
-if __name__ == '__main__':
-    print()
-    app.run()
+def main():
+    app.run(host='0.0.0.0', port=3004)
+
+
+if __name__ == "__main__":
+    main()
