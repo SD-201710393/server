@@ -1,4 +1,5 @@
 import json
+import sys
 import threading
 import time
 from flask import Flask
@@ -48,7 +49,7 @@ def thr_func(lock):
 
 
 def main():
-    app.run(host='0.0.0.0', port=3002)
+    app.run(host='0.0.0.0', port=int(sys.argv[1]))
 
 
 if __name__ == "__main__":
