@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import threading
 import time
@@ -49,7 +50,7 @@ def thr_func(lock):
 
 
 def main():
-    app.run(host='0.0.0.0', port=int(sys.argv[1]))
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 3002)))
 
 
 if __name__ == "__main__":

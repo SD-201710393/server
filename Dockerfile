@@ -6,4 +6,4 @@ WORKDIR /app
 RUN pip install -e .
 # Comando valido do setup.py
 ENTRYPOINT ["run_server"]
-CMD ["$PORT"]
+#CMD ["$PORT"]
