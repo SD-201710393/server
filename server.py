@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 import threading
 import time
 from flask import Flask
@@ -31,7 +30,6 @@ def res():
 
 @app.route('/info', methods=['GET'])        # Call this to pull info about this module
 def home():
-    print('Reached home')
     componente = "server"
     desc = "serve os clientes com servicos variados"
     ver = "0.1"
@@ -51,7 +49,6 @@ def thr_func(lock):
 
 
 def main():
-    print('Entry point reached')
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 3002)))
 
 
