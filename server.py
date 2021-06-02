@@ -88,7 +88,7 @@ def d_set_info():
             ver = t_ver
             desc = t_desc
             acess_point = t_acess_point
-            is_busy = t_status
+            is_busy = (True if t_status == "down" else False)
             uid = t_uid
             is_leader = t_is_leader
             election = t_election
