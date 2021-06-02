@@ -63,9 +63,15 @@ def d_set_info():
     # 409 - Conflict
     # 200 - OK
     req = request.json
+    out = {
+        "atualizado": None,
+        "falha": None,
+        "info_atual": None
+    }
 
-    if len(req) < exp_amount:
+    if len(req) != exp_amount:
         return_code = 400
+        out["falha"] = f"Quantidade de argumentos diferente de {exp_amount}"
         print("[DEBUG] Invalid length")
     else:
         try:
@@ -87,8 +93,9 @@ def d_set_info():
             is_leader = t_is_leader
             election = t_election
             return_code = 200
-        except():           # If we reached here, something was wrong on the dictionary
+        except KeyError:    # If we reached here, something was wrong on the dictionary
             return_code = 409
+            out["falha"] = "Uma ou mais chaves invalidas"
             print("[DEBUG] One or more keys missing / invalid")
 
     curr_server_details = {
@@ -101,11 +108,9 @@ def d_set_info():
         "lider": int(is_leader),
         "eleicao": election
     }
-    out = {
-        "atualizado": (True if return_code == 200 else False),
-        "info_atual": curr_server_details
+    out["atualizado"] = (True if return_code == 200 else False)
+    out["info_atual"] = curr_server_details
 
-    }
     return out, return_code
 
 
