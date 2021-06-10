@@ -32,6 +32,13 @@ def shtdwn():
     pass
 
 
+@app.route('/recurso', methods=['GET'])    # Call this to get the resource status
+def res_get():
+    global is_busy
+    server_res = {"ocupado": is_busy}
+    return json.dumps(server_res), 200
+
+
 @app.route('/recurso', methods=['POST'])    # Call this to simulate handling a resource
 def res():
     global is_busy
