@@ -14,17 +14,30 @@ acess_point = "https://sd-rdm.herokuapp.com"
 is_busy = False                                # If true, it's busy or 'down'. Otherwise, it's 'up'
 uid = 2
 is_leader = False
+elect_running = False
 election = "valentao"
+web_servers = ["https://sd-201620236.herokuapp.com", "https://sd-jhsq.herokuapp.com"]
+
+
+@app.route('/eleicao/coordenador', methods=['POST'])      # Call this to say this server is a leader
+def set_coord():
+    # TODO
+    pass
 
 
 @app.route('/eleicao', methods=['POST'])      # Call this to say this server is a leader
 def elected():
+    # TODO
     pass
 
 
 @app.route('/eleicao', methods=['GET'])      # Call this to acknowledge an election is in process
 def ack_election():
-    pass
+    out = {
+        "tipo_de_eleicao_ativa": election,
+        "eleicao_em_andamento": elect_running
+    }
+    return json.dumps(out), 200
 
 
 @app.route('/shutdown', methods=['GET'])    # Call this to simulate a server shutdown
@@ -34,7 +47,7 @@ def shtdwn():
 
 @app.route('/recurso', methods=['GET'])    # Call this to get the resource status
 def res_get():
-    global is_busy
+    # global is_busy    # Talvez seja desnecessario ja que e somente acesso
     server_res = {"ocupado": is_busy}
     return json.dumps(server_res), 200
 
@@ -123,6 +136,13 @@ def d_set_info():
 
 @app.route('/info', methods=['GET'])        # Call this to pull info about this module
 def info():
+    known_servers = []
+    for i in range(len(web_servers)):
+        server = {
+            "id": "server"+str(i+1),
+            "url": web_servers[i]
+        }
+        known_servers.append(server)
     out = {
         "componente": componente,
         "versao": ver,
@@ -131,7 +151,8 @@ def info():
         "status": ("down" if is_busy else "up"),
         "identificacao": uid,
         "lider": int(is_leader),
-        "eleicao": election
+        "eleicao": election,
+        "servidores_conhecidos": known_servers
     }
 
     return json.dumps(out), 200
