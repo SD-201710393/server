@@ -17,7 +17,8 @@ is_leader = False
 elect_running = False
 election = "valentao"
 web_servers = ["https://sd-201620236.herokuapp.com", "https://sd-jhsq.herokuapp.com",
-               "https://sd-mgs.herokuapp.com", "https://sd-app-server-jesulino.herokuapp.com"]
+               "https://sd-mgs.herokuapp.com", "https://sd-app-server-jesulino.herokuapp.com",
+               "https://sd-dmss.herokuapp.com"]
 
 
 @app.route('/eleicao/coordenador', methods=['POST'])      # Call this to say this server is a leader
