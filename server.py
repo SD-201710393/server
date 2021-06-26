@@ -42,14 +42,19 @@ def set_coord():
     global is_leader
     global elect_running
     global cur_election
+    success = False
     req = request.json
     if len(req) == 2 and req["id_eleicao"] == cur_election:
         is_leader = False
         elect_running = False
         cur_election = ""
+        success = True
     else:
         print("[DEBUG] Invalid coordinator request. Either invalid amount of arguments or invalid election!")
-    return 200
+    out = {
+        "successo": success
+    }
+    return json.dumps(out), 200
 
 @app.route('/eleicao', methods=['POST'])                 # Call this to start an election
 def elected():
