@@ -2,38 +2,71 @@ import json
 import os
 import threading
 import time
+import requests
 from flask import Flask
 from flask import request
 
 app = Flask(__name__)
 # Server details that get pulled from '/info' in their respective order
 componente = "server"
-ver = "0.3"
+ver = "0.5"
 desc = "serve os clientes com servicos variados"
 acess_point = "https://sd-rdm.herokuapp.com"
 is_busy = False                                # If true, it's busy or 'down'. Otherwise, it's 'up'
 uid = 2
 is_leader = False
+have_competition = True                        # If true, at least one server have an UID higher than this
 elect_running = False
+cur_election: str
 election = "valentao"
-web_servers = ["https://sd-201620236.herokuapp.com", "https://sd-jhsq.herokuapp.com",
-               "https://sd-mgs.herokuapp.com", "https://sd-app-server-jesulino.herokuapp.com",
-               "https://sd-dmss.herokuapp.com"]
+urls = ["https://sd-201620236.herokuapp.com", "https://sd-jhsq.herokuapp.com",
+        "https://sd-mgs.herokuapp.com", "https://sd-app-server-jesulino.herokuapp.com",
+        "https://sd-dmss.herokuapp.com"]
+
+is_shadow = False                           # If true, use the shadow servers for communication
+shadow_servers = ["https://sd-rdm-shadow1.herokuapp.com", "https://sd-rdm-shadow2.herokuapp.com"]
+
+
+@app.route('/eleicao/reset', methods=['GET'])             # Resets the election counter
+def reset_elec_count():
+    global cur_election
+    cur_election = 0
+    out = {
+        "id": str(cur_election)
+    }
+    return json.dumps(out), 200
 
 
 @app.route('/eleicao/coordenador', methods=['POST'])      # Call this to say this server is a leader
 def set_coord():
-    # TODO
-    pass
+    global is_leader
+    global elect_running
+    req = request.json
+    if len(req) == 2 and req["id_eleicao"] == cur_election:
+        is_leader = False
+        elect_running = False
+    else:
+        print("[DEBUG] Invalid coordinator request. Either invalid amount of arguments or invalid election!")
 
 
-@app.route('/eleicao', methods=['POST'])      # Call this to say this server is a leader
+@app.route('/eleicao', methods=['POST'])                 # Call this to start an election
 def elected():
-    # TODO
-    pass
+    global cur_election
+    global elect_running
+    try:
+        cur_election = request.json["id"]
+        if elect_running is False:
+            elect_running = True
+            run_election()
+    except KeyError:
+        print("[DEBUG] Key is missing")
+    out = {
+        "id": cur_election
+    }
+    return json.dumps(out), 200
 
 
-@app.route('/eleicao', methods=['GET'])      # Call this to acknowledge an election is in process
+@app.route('/eleicao', methods=['GET'])                 # Call this to acknowledge an election is in process
 def ack_election():
     out = {
         "tipo_de_eleicao_ativa": election,
@@ -42,12 +75,12 @@ def ack_election():
     return json.dumps(out), 200
 
 
-@app.route('/shutdown', methods=['GET'])    # Call this to simulate a server shutdown
+@app.route('/shutdown', methods=['GET'])                # Call this to simulate a server shutdown
 def shtdwn():
     pass
 
 
-@app.route('/recurso', methods=['GET'])    # Call this to get the resource status
+@app.route('/recurso', methods=['GET'])                 # Call this to get the resource status
 def res_get():
     # global is_busy    # Talvez seja desnecessario ja que e somente acesso
     server_res = {"ocupado": is_busy}
@@ -139,10 +172,10 @@ def d_set_info():
 @app.route('/info', methods=['GET'])        # Call this to pull info about this module
 def info():
     known_servers = []
-    for i in range(len(web_servers)):
+    for i in range(len(urls)):
         server = {
             "id": "server"+str(i+1),
-            "url": web_servers[i]
+            "url": urls[i]
         }
         known_servers.append(server)
     out = {
@@ -160,6 +193,68 @@ def info():
     return json.dumps(out), 200
 
 
+def become_coord():
+    global is_leader
+    global elect_running
+    out = {
+        "coordenador": uid,
+        "id_eleicao": cur_election
+    }
+    request_post_all("/eleicao/coordenador", out)
+    is_leader = True
+    elect_running = False
+
+
+def request_get_all(route, out_json):
+    for u in urls:
+        threading.Thread(target=(lambda: requests.get(u + route, json=out_json))).start()
+
+
+def request_post_all(route, out_json):
+    for u in urls:
+        threading.Thread(target=(lambda: requests.post(u + route, json=out_json))).start()
+
+
+def run_election():
+    global elect_running
+    global cur_election
+    global have_competition
+    have_competition = False
+    thr = []
+    if election == "valentao":
+        for server in urls:
+            thr.append(threading.Thread(target=elec_valentao, args=(server, )))
+            thr[-1].start()
+        for i in range(len(thr)):
+            thr[i].join()
+        if have_competition is False:   # No one opposed this server, set it as coordinator
+            print('[DEBUG] This server is the new coordinator')
+            become_coord()
+        else:
+            print("[DEBUG] This server have competitors")
+    elif election == "anel":
+        pass
+    else:
+        print(f"[DEBUG] Unknown election type: '{election}'")
+
+
+def elec_valentao(target):
+    # Fire a GET at target/info and get the response...
+    # ... if it's id < your id
+    global have_competition
+    try:
+        target_info = requests.get(target + "/info").json()
+        if target_info["identificacao"] > uid:
+            have_competition = True
+            print(f"[DEBUG] Lose against '{target}'")
+        else:
+            print(f"[DEBUG] Won against '{target}'")
+    except requests.ConnectionError:
+        print(f"[DEBUG] Server '{target}' if offline")
+    except KeyError:
+        print(f"[DEBUG] Couldn't get info on server '{target}'")
+
+
 def thr_func():
     global is_busy
     print("[DEBUG] Thread fired, waiting 10s...")
@@ -169,7 +264,7 @@ def thr_func():
 
 
 def main():
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 3002)))
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ setup(
     author="Ramon Darwich de Menezes",
     description="Handles and organizes connection between clients and worker servers",
     license="GNU",
-    install_requires=["flask"],
+    install_requires=["flask", "requests"],
     entry_points={
         "console_scripts": [
             # <Nome do Comando>=<Modulo (Arquivo)>:<Funcao>
