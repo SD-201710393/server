@@ -49,7 +49,7 @@ def set_coord():
         cur_election = ""
     else:
         print("[DEBUG] Invalid coordinator request. Either invalid amount of arguments or invalid election!")
-
+    return 200
 
 @app.route('/eleicao', methods=['POST'])                 # Call this to start an election
 def elected():
