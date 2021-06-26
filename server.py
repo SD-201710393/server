@@ -41,10 +41,12 @@ def reset_elec_count():
 def set_coord():
     global is_leader
     global elect_running
+    global cur_election
     req = request.json
     if len(req) == 2 and req["id_eleicao"] == cur_election:
         is_leader = False
         elect_running = False
+        cur_election = ""
     else:
         print("[DEBUG] Invalid coordinator request. Either invalid amount of arguments or invalid election!")
 
@@ -242,10 +244,12 @@ def elec_valentao(target):
     # Fire a GET at target/info and get the response...
     # ... if it's id < your id
     global have_competition
+    global cur_election
     try:
         target_info = requests.get(target + "/info").json()
         if target_info["identificacao"] > uid:
             have_competition = True
+            requests.post(target + "/eleicao", json={"id": cur_election})
             print(f"[DEBUG] Lose against '{target}'")
         else:
             print(f"[DEBUG] Won against '{target}'")
