@@ -34,16 +34,13 @@ def reset():
     out = {
         "id": str(cur_election)
     }
-    set_coord()
+    requests.post(acess_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
     return json.dumps(out), 200
 
 
 @app.route('/eleicao/coordenador', methods=['POST'])      # Call this to say this server is a leader
 def coord_decision():
     global is_leader
-    global elect_running
-    global cur_election
-    global started_ring
     success = False
     req = request.json
     return_code: int
@@ -53,6 +50,7 @@ def coord_decision():
             set_coord()
             success = True
             return_code = 200
+            print(f"[DEBUG] Election '{cur_election}' ended")
         else:
             print("[DEBUG] Invalid coordinator request. Either invalid amount of arguments or invalid election!")
             return_code = 400
@@ -284,7 +282,7 @@ def run_election():
             thr[i].join()
         if have_competition is False:   # No one opposed this server, set it as coordinator
             print('[DEBUG] This server is the new coordinator')
-            set_coord()
+            requests.post(acess_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
         else:
             print("[DEBUG] This server have competitors")
     elif election_type == "anel":
