@@ -20,7 +20,7 @@ have_competition = True                        # If true, at least one server ha
 elect_running = False
 started_ring = False                           # If true, this server started a 'ring election'
 cur_election = ""
-election_type = "anel"
+election_type = "valentao"
 urls = ["https://sd-201620236.herokuapp.com", "https://sd-jhsq.herokuapp.com",
         "https://sd-mgs.herokuapp.com", "https://sd-app-server-jesulino.herokuapp.com",
         "https://sd-dmss.herokuapp.com"]
@@ -248,6 +248,7 @@ def info():
 def set_coord():
     global elect_running
     global started_ring
+    global cur_election
     if is_leader is True:
         out = {
             "coordenador": uid,
