@@ -3,6 +3,7 @@ import os
 import threading
 import time
 import requests
+from operator import itemgetter
 from flask import Flask
 from flask import request
 
@@ -13,12 +14,13 @@ ver = "0.5"
 desc = "serve os clientes com servicos variados"
 acess_point = "https://sd-rdm.herokuapp.com"
 is_busy = False                                # If true, it's busy or 'down'. Otherwise, it's 'up'
-uid = 2
+uid = 3
 is_leader = False
 have_competition = True                        # If true, at least one server have an UID higher than this
 elect_running = False
-cur_election: str
-election = "valentao"
+started_ring = False                           # If true, this server started a 'ring election'
+cur_election = ""
+election_type = "anel"
 urls = ["https://sd-201620236.herokuapp.com", "https://sd-jhsq.herokuapp.com",
         "https://sd-mgs.herokuapp.com", "https://sd-app-server-jesulino.herokuapp.com",
         "https://sd-dmss.herokuapp.com"]
@@ -38,45 +40,87 @@ def reset_elec_count():
 
 
 @app.route('/eleicao/coordenador', methods=['POST'])      # Call this to say this server is a leader
-def set_coord():
+def coord_decision():
     global is_leader
     global elect_running
     global cur_election
+    global started_ring
     success = False
     req = request.json
-    if len(req) == 2 and req["id_eleicao"] == cur_election:
-        is_leader = False
-        elect_running = False
-        cur_election = ""
-        success = True
-    else:
-        print("[DEBUG] Invalid coordinator request. Either invalid amount of arguments or invalid election!")
+    return_code: int
+    try:
+        if len(req) == 2 and req["id_eleicao"] == cur_election:
+            is_leader = req["coordenador"] == uid
+            set_coord()
+            success = True
+            return_code = 200
+        else:
+            print("[DEBUG] Invalid coordinator request. Either invalid amount of arguments or invalid election!")
+            return_code = 400
+    except KeyError:
+        success = False
+        return_code = 400
     out = {
         "successo": success
     }
-    return json.dumps(out), 200
+    return json.dumps(out), return_code
+
 
 @app.route('/eleicao', methods=['POST'])                 # Call this to start an election
 def elected():
     global cur_election
     global elect_running
+    global started_ring
+    return_code: int
     try:
         cur_election = request.json["id"]
-        if elect_running is False:
+        if cur_election is None:
+            print("[DEBUG] Current Election id is NULL!")
+            return_code = 400
+        elif elect_running is False:
             elect_running = True
+            if election_type == "anel" and ("-" not in cur_election):
+                started_ring = True
             run_election()
+            return_code = 200
+        elif election_type == "anel" and ("-" + str(uid) in cur_election) and started_ring is True:
+            # Only goes here if it's a ring election, it's ID is present and it started the election...
+            # ... then we can finish it!
+            ids_str = cur_election.split("-")   # Get all ids
+            ids = map(int, ids_str)             # Convert to numbers
+            ids.sort()                          # Sort them
+            if ids[-1] < uid:                   # Our id is higher, then, set ourselves as the new coordinator
+                requests.post(acess_point + '/eleicao/coordenador',
+                              json={"coordenador": uid, "id_eleicao": cur_election})
+            else:                               # But if not, search the server with this id and set it
+                for server in urls:
+                    try:
+                        new_coord = requests.get(server + "/info").json()
+                        if new_coord["identificacao"] == uid:
+                            requests.post(new_coord + "/eleicao/coordenador",
+                                          json={"coordenador": ids[-1], "id_eleicao": cur_election})
+                        elif new_coord["status"] == "down":
+                            print(f"[DEBUG] New Coordinator '{server}' became down")
+                    except requests.ConnectionError:
+                        print(f"[DEBUG] New Coordinator '{server}' became offline")
+                    except KeyError:
+                        print(f"[DEBUG] Couldn't get info on New Coordinator '{server}'")
+            return_code = 200
+        else:
+            return_code = 409   # Return 'conflict' if there is an election running
     except KeyError:
         print("[DEBUG] Key is missing")
+        return_code = 400
     out = {
         "id": cur_election
     }
-    return json.dumps(out), 200
+    return json.dumps(out), return_code
 
 
 @app.route('/eleicao', methods=['GET'])                 # Call this to acknowledge an election is in process
 def ack_election():
     out = {
-        "tipo_de_eleicao_ativa": election,
+        "tipo_de_eleicao_ativa": election_type,
         "eleicao_em_andamento": elect_running
     }
     return json.dumps(out), 200
@@ -112,53 +156,57 @@ def res():
 @app.route('/info', methods=['POST'])       # Call this to manually set info (DEBUG function)
 def d_set_info():
     return_code: int
-    exp_amount = 8          # We expect the incoming JSON to have 8 keys
-    global componente
-    global ver
-    global desc
-    global acess_point
+    # global componente
+    # global ver
+    # global desc
+    # global acess_point
     global is_busy
     global uid
     global is_leader
-    global election
+    global election_type
     # 400 - Bad Request (Data was invalid)
     # 409 - Conflict
     # 200 - OK
     req = request.json
+    return_code = 200   # If something goes wrong, this will be updated to either 400 or 409
     out = {
-        "atualizado": None,
-        "falha": None,
+        "atencao": None,
         "info_atual": None
     }
-
-    if len(req) != exp_amount:
+    try:
+        if req["status"] == "down":
+            is_busy = True
+        elif req["status"] == "up":
+            is_busy = False
+        else:
+            return_code = 400
+    except KeyError:  # If we reached here, something was wrong on the dictionary
         return_code = 400
-        out["falha"] = f"Quantidade de argumentos diferente de {exp_amount}"
-        print("[DEBUG] Invalid length")
-    else:
-        try:
-            t_componente = req["componente"]
-            t_ver = req["versao"]
-            t_desc = req["descricao"]
-            t_acess_point = req["ponto_de_acesso"]
-            t_status = req["status"]
-            t_uid = req["identificacao"]
-            t_is_leader = req["lider"]
-            t_election = req["eleicao"]
-            # If we reached here, all entries were read successfully
-            componente = t_componente
-            ver = t_ver
-            desc = t_desc
-            acess_point = t_acess_point
-            is_busy = (True if t_status == "down" else False)
-            uid = t_uid
-            is_leader = t_is_leader
-            election = t_election
-            return_code = 200
-        except KeyError:    # If we reached here, something was wrong on the dictionary
-            return_code = 409
-            out["falha"] = "Uma ou mais chaves invalidas"
-            print("[DEBUG] One or more keys missing / invalid")
+    try:
+        uid = req["identificacao"]
+    except KeyError:
+        return_code = 400
+    try:
+        if req["lider"] == 1:
+            is_leader = True
+        elif req["lider"] == 0:
+            is_leader = False
+        else:
+            return_code = 400
+    except KeyError:
+        return_code = 400
+    try:
+        if req["eleicao"] == "valentao":
+            election_type = "valentao"
+        elif req["eleicao"] == "anel":
+            election_type = "anel"
+        else:
+            return_code = 400
+    except KeyError:
+        return_code = 400
+    if return_code == 400:
+        out["atencao"] = "Uma ou mais chaves invalidas"
+        print("[DEBUG] One or more keys missing / invalid")
 
     curr_server_details = {
         "componente": componente,
@@ -168,9 +216,8 @@ def d_set_info():
         "status": ("down" if is_busy else "up"),
         "identificacao": uid,
         "lider": int(is_leader),
-        "eleicao": election
+        "eleicao": election_type
     }
-    out["atualizado"] = (True if return_code == 200 else False)
     out["info_atual"] = curr_server_details
 
     return out, return_code
@@ -193,23 +240,23 @@ def info():
         "status": ("down" if is_busy else "up"),
         "identificacao": uid,
         "lider": int(is_leader),
-        "eleicao": election,
+        "eleicao": election_type,
         "servidores_conhecidos": known_servers
     }
-
     return json.dumps(out), 200
 
 
-def become_coord():
-    global is_leader
+def set_coord():
     global elect_running
-    out = {
-        "coordenador": uid,
-        "id_eleicao": cur_election
-    }
-    request_post_all("/eleicao/coordenador", out)
-    is_leader = True
+    global started_ring
+    if is_leader is True:
+        out = {
+            "coordenador": uid,
+            "id_eleicao": cur_election
+        }
+        request_post_all("/eleicao/coordenador", out)
     elect_running = False
+    started_ring = False
 
 
 def request_get_all(route, out_json):
@@ -228,7 +275,7 @@ def run_election():
     global have_competition
     have_competition = False
     thr = []
-    if election == "valentao":
+    if election_type == "valentao":
         for server in urls:
             thr.append(threading.Thread(target=elec_valentao, args=(server, )))
             thr[-1].start()
@@ -236,13 +283,24 @@ def run_election():
             thr[i].join()
         if have_competition is False:   # No one opposed this server, set it as coordinator
             print('[DEBUG] This server is the new coordinator')
-            become_coord()
+            set_coord()
         else:
             print("[DEBUG] This server have competitors")
-    elif election == "anel":
-        pass
+    elif election_type == "anel":
+        id_list = []
+        for i in range(len(urls)):
+            id_list.append((urls[i], -1))
+            thr.append(threading.Thread(target=elec_anel, args=(urls[i], id_list, i)))
+            thr[-1].start()
+        for i in range(len(thr)):
+            thr[i].join()
+        id_list.sort(key=itemgetter(1))     # Sort using the [1] element of the tuple
+        for server_id in id_list:
+            if server_id[1] > uid:
+                requests.post(server_id[0] + "/eleicao", json={"id": cur_election + '-' + str(uid)})
+                break
     else:
-        print(f"[DEBUG] Unknown election type: '{election}'")
+        print(f"[DEBUG] Unknown election type: '{election_type}'")
 
 
 def elec_valentao(target):
@@ -255,13 +313,37 @@ def elec_valentao(target):
         if target_info["identificacao"] > uid:
             have_competition = True
             requests.post(target + "/eleicao", json={"id": cur_election})
-            print(f"[DEBUG] Lose against '{target}'")
+            print(f"[DEBUG] Lost against '{target}'")
+        elif target_info["status"] == "down":
+            print(f"[DEBUG] Server '{target}' is down")
+        elif target_info["eleicao"] == "anel":
+            print(f"[DEBUG] Server '{target}' is using a different election type")
         else:
             print(f"[DEBUG] Won against '{target}'")
     except requests.ConnectionError:
         print(f"[DEBUG] Server '{target}' if offline")
     except KeyError:
         print(f"[DEBUG] Couldn't get info on server '{target}'")
+    except TypeError:
+        print(f"[DEBUG] Server '{target}' sent data in an invalid format")
+
+
+def elec_anel(target, id_list, i):
+    try:
+        target_info = requests.get(target + "/info").json()
+        if target_info["status"] == "down":
+            print(f"[DEBUG] Server '{target}' is down")
+        elif target_info["eleicao"] == "valentao":
+            print(f"[DEBUG] Server '{target}' is using a different election type")
+        else:
+            id_list[i] = (target, target_info["identificacao"])
+    except requests.ConnectionError:
+        print(f"[DEBUG] Server '{target}' if offline")
+    except KeyError:
+        print(f"[DEBUG] Couldn't get info on server '{target}'")
+    except TypeError:
+        id_list[i] = (target, -1)
+        print(f"[DEBUG] Server '{target}' sent data in an invalid format")
 
 
 def thr_func():
