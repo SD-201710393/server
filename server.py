@@ -34,22 +34,20 @@ def reset():
     out = {
         "id": str(cur_election)
     }
-    set_coord()
+    requests.post(acess_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
     return json.dumps(out), 200
 
 
 @app.route('/eleicao/coordenador', methods=['POST'])      # Call this to say this server is a leader
 def coord_decision():
     global is_leader
-    global elect_running
-    global cur_election
-    global started_ring
     success = False
     req = request.json
     return_code: int
     try:
         if len(req) == 2 and req["id_eleicao"] == cur_election:
             is_leader = req["coordenador"] == uid
+            print(f"[DEBUG] Election '{cur_election}' ended")
             set_coord()
             success = True
             return_code = 200
@@ -106,6 +104,7 @@ def elected():
                         print(f"[DEBUG] Couldn't get info on New Coordinator '{server}'")
             return_code = 200
         else:
+            print(f"[DEBUG] Election '{cur_election}' is still running")
             return_code = 409   # Return 'conflict' if there is an election running
     except KeyError:
         print("[DEBUG] Key is missing")
@@ -180,11 +179,11 @@ def d_set_info():
         else:
             return_code = 400
     except KeyError:  # If we reached here, something was wrong on the dictionary
-        return_code = 400
+        pass
     try:
         uid = req["identificacao"]
     except KeyError:
-        return_code = 400
+        pass
     try:
         if req["lider"] == 1:
             is_leader = True
@@ -193,7 +192,7 @@ def d_set_info():
         else:
             return_code = 400
     except KeyError:
-        return_code = 400
+        pass
     try:
         if req["eleicao"] == "valentao":
             election_type = "valentao"
@@ -202,7 +201,8 @@ def d_set_info():
         else:
             return_code = 400
     except KeyError:
-        return_code = 400
+        pass
+
     if return_code == 400:
         out["atencao"] = "Uma ou mais chaves invalidas"
         print("[DEBUG] One or more keys missing / invalid")
@@ -284,7 +284,7 @@ def run_election():
             thr[i].join()
         if have_competition is False:   # No one opposed this server, set it as coordinator
             print('[DEBUG] This server is the new coordinator')
-            set_coord()
+            requests.post(acess_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
         else:
             print("[DEBUG] This server have competitors")
     elif election_type == "anel":
@@ -299,7 +299,17 @@ def run_election():
         for server_id in id_list:
             if server_id[1] > uid:
                 requests.post(server_id[0] + "/eleicao", json={"id": cur_election + '-' + str(uid)})
-                break
+                return
+        # If we reached here, none servers have an ID higher than this, then, send to the lowest...
+        # ... but check first if all of them failed...
+        valid_servers = 0
+        for server_id in id_list:
+            if server_id[1] > -1:
+                valid_servers += 1
+        if valid_servers == 0:      # ... since all of them failed, set ourselves as the new coordinator
+            requests.post(acess_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
+        else:                       # ... otherwise, send a request to the lowest ID available
+            requests.post(id_list[0][0] + "/eleicao", json={"id": cur_election + '-' + str(uid)})
     else:
         print(f"[DEBUG] Unknown election type: '{election_type}'")
 
@@ -338,13 +348,14 @@ def elec_anel(target, id_list, i):
             print(f"[DEBUG] Server '{target}' is using a different election type")
         else:
             id_list[i] = (target, target_info["identificacao"])
+            return
     except requests.ConnectionError:
         print(f"[DEBUG] Server '{target}' if offline")
     except KeyError:
         print(f"[DEBUG] Couldn't get info on server '{target}'")
     except TypeError:
-        id_list[i] = (target, -1)
         print(f"[DEBUG] Server '{target}' sent data in an invalid format")
+    id_list[i] = (target, -1)
 
 
 def thr_func():
