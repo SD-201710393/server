@@ -51,7 +51,6 @@ def coord_decision():
             set_coord()
             success = True
             return_code = 200
-            print(f"[DEBUG] Election '{cur_election}' ended")
         else:
             print("[DEBUG] Invalid coordinator request. Either invalid amount of arguments or invalid election!")
             return_code = 400
@@ -325,7 +324,7 @@ def elec_valentao(target):
         if target_info["identificacao"] > uid:
             have_competition = True
             requests.post(target + "/eleicao", json={"id": cur_election})
-            print(f"[DEBUG] Lost against '{target}'")
+            print("[DEBUG] Lost against '%s' [%d]" % (target, target_info["identificacao"]))
         elif target_info["status"] == "down":
             print(f"[DEBUG] Server '{target}' is down")
         elif target_info["eleicao"] == "anel":
