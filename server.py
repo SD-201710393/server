@@ -51,6 +51,7 @@ def coord_decision():
             set_coord()
             success = True
             return_code = 200
+            print(f"[DEBUG] Election '{cur_election}' ended")
         else:
             print("[DEBUG] Invalid coordinator request. Either invalid amount of arguments or invalid election!")
             return_code = 400
