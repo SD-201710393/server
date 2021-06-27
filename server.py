@@ -30,12 +30,11 @@ shadow_servers = ["https://sd-rdm-shadow1.herokuapp.com", "https://sd-rdm-shadow
 
 
 @app.route('/eleicao/reset', methods=['GET'])             # Resets the election counter
-def reset_elec_count():
-    global cur_election
-    cur_election = 0
+def reset():
     out = {
         "id": str(cur_election)
     }
+    set_coord()
     return json.dumps(out), 200
 
 
@@ -255,6 +254,7 @@ def set_coord():
             "id_eleicao": cur_election
         }
         request_post_all("/eleicao/coordenador", out)
+    cur_election = ""
     elect_running = False
     started_ring = False
 
