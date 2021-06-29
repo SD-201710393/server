@@ -25,6 +25,7 @@ election_type = "anel"
 urls = ["https://sd-201620236.herokuapp.com", "https://sd-jhsq.herokuapp.com",
         "https://sd-mgs.herokuapp.com", "https://sd-app-server-jesulino.herokuapp.com",
         "https://sd-dmss.herokuapp.com"]
+log_url = "https://sd-log-server.herokuapp.com"
 
 is_shadow = False                           # If true, use the shadow servers for communication
 shadow_servers = ["https://sd-rdm-shadow1.herokuapp.com", "https://sd-rdm-shadow2.herokuapp.com"]
