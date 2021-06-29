@@ -49,6 +49,8 @@ def coord_decision():
         if len(req) == 2:
             if req["id_eleicao"] == cur_election or req["id_eleicao"] == "reset":
                 is_leader = req["coordenador"] == uid
+                if is_leader:
+                    print('[DEBUG] This server is the new coordinator')
                 print(f"[DEBUG] Election '{cur_election}' ended")
                 set_coord()
                 success = True
@@ -59,11 +61,14 @@ def coord_decision():
                 success = True
                 return_code = 200
             else:
+                got_elec = req["id_eleicao"]
+                print(f"[DEBUG] Election mismatch! Expected '{cur_election}' but received '{got_elec}'")
                 return_code = 400
         else:
             print("[DEBUG] Invalid coordinator request. Either invalid amount of arguments or invalid election!")
             return_code = 400
     except KeyError:
+        print("[DEBUG] Invalid coordinator request. A required key is missing")
         success = False
         return_code = 400
     out = {
@@ -133,14 +138,8 @@ def ack_election():
     return json.dumps(out), 200
 
 
-@app.route('/shutdown', methods=['GET'])                # Call this to simulate a server shutdown
-def shtdwn():
-    pass
-
-
 @app.route('/recurso', methods=['GET'])                 # Call this to get the resource status
 def res_get():
-    # global is_busy    # Talvez seja desnecessario ja que e somente acesso
     server_res = {"ocupado": is_busy}
     return json.dumps(server_res), 200
 
@@ -163,17 +162,10 @@ def res():
 @app.route('/info', methods=['POST'])       # Call this to manually set info (DEBUG function)
 def d_set_info():
     return_code: int
-    # global componente
-    # global ver
-    # global desc
-    # global acess_point
     global is_busy
     global uid
     global is_leader
     global election_type
-    # 400 - Bad Request (Data was invalid)
-    # 409 - Conflict
-    # 200 - OK
     req = request.json
     return_code = 200   # If something goes wrong, this will be updated to either 400 or 409
     out = {
@@ -270,11 +262,13 @@ def set_coord():
 
 
 def request_get_all(route, out_json):
+    print(f"[DEBUG] Firing on all servers' [GET]  '{route}'")
     for u in urls:
         threading.Thread(target=(lambda: requests.get(u + route, json=out_json))).start()
 
 
 def request_post_all(route, out_json):
+    print(f"[DEBUG] Firing on all servers' [POST] '{route}'")
     for u in urls:
         threading.Thread(target=(lambda: requests.post(u + route, json=out_json))).start()
 
@@ -293,7 +287,6 @@ def run_election():
         for i in range(len(thr)):
             thr[i].join()
         if have_competition is False:   # No one opposed this server, set it as coordinator
-            print('[DEBUG] This server is the new coordinator')
             requests.post(acess_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
         else:
             print("[DEBUG] This server have competitors")
@@ -308,6 +301,7 @@ def run_election():
         id_list.sort(key=itemgetter(1))   # Sort using the [1] element of the tuple
         for server_id in id_list:
             if server_id[1] > uid:        # Send a request to the first server that have an ID higher than this
+                print(f"[DEBUG] Sending -{uid} to '{server_id[0]}'")
                 requests.post(server_id[0] + "/eleicao", json={"id": cur_election + '-' + str(uid)})
                 return
         # If we reached here, none servers have an ID higher than this, then, send to the lowest...
@@ -317,8 +311,10 @@ def run_election():
             if server_id[1] > -1:
                 valid_servers.append(server_id)
         if len(valid_servers) == 0:      # ... since all of them failed, set ourselves as the new coordinator
+            print("[DEBUG] There was no valid response from any server")
             requests.post(acess_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
         else:                            # ... otherwise, send a request to the lowest, valid ID available
+            print(f"[DEBUG] Sending -{uid} to '{valid_servers[0][0]}'")
             requests.post(valid_servers[0][0] + "/eleicao", json={"id": cur_election + '-' + str(uid)})
     else:
         print(f"[DEBUG] Unknown election type: '{election_type}'")
