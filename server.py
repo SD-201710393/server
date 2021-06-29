@@ -19,8 +19,9 @@ is_leader = False
 have_competition = True                        # If true, at least one server have an UID higher than this
 elect_running = False
 started_ring = False                           # If true, this server started a 'ring election'
+election_timeout = 10                          # Timeout, in seconds, for an election to be canceled
 cur_election = ""
-election_type = "valentao"
+election_type = "anel"
 urls = ["https://sd-201620236.herokuapp.com", "https://sd-jhsq.herokuapp.com",
         "https://sd-mgs.herokuapp.com", "https://sd-app-server-jesulino.herokuapp.com",
         "https://sd-dmss.herokuapp.com"]
@@ -34,7 +35,7 @@ def reset():
     out = {
         "id": str(cur_election)
     }
-    requests.post(acess_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
+    requests.post(acess_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": "reset"})
     return json.dumps(out), 200
 
 
@@ -45,12 +46,20 @@ def coord_decision():
     req = request.json
     return_code: int
     try:
-        if len(req) == 2 and req["id_eleicao"] == cur_election:
-            is_leader = req["coordenador"] == uid
-            print(f"[DEBUG] Election '{cur_election}' ended")
-            set_coord()
-            success = True
-            return_code = 200
+        if len(req) == 2:
+            if req["id_eleicao"] == cur_election or req["id_eleicao"] == "reset":
+                is_leader = req["coordenador"] == uid
+                print(f"[DEBUG] Election '{cur_election}' ended")
+                set_coord()
+                success = True
+                return_code = 200
+            elif req["id_eleicao"] == "canceled":
+                print(f"[DEBUG] Election was canceled!")
+                set_coord()
+                success = True
+                return_code = 200
+            else:
+                return_code = 400
         else:
             print("[DEBUG] Invalid coordinator request. Either invalid amount of arguments or invalid election!")
             return_code = 400
@@ -140,7 +149,7 @@ def res_get():
 def res():
     global is_busy
     return_code: int
-    thr = threading.Thread(target=thr_func, args=())
+    thr = threading.Thread(target=make_busy, args=())
     if is_busy:
         return_code = 409
     else:
@@ -276,6 +285,7 @@ def run_election():
     global have_competition
     have_competition = False
     thr = []
+    threading.Thread(target=elec_timeout).start()   # If an election takes too long, cancel it
     if election_type == "valentao":
         for server in urls:
             thr.append(threading.Thread(target=elec_valentao, args=(server, )))
@@ -295,21 +305,21 @@ def run_election():
             thr[-1].start()
         for i in range(len(thr)):
             thr[i].join()
-        id_list.sort(key=itemgetter(1))     # Sort using the [1] element of the tuple
+        id_list.sort(key=itemgetter(1))   # Sort using the [1] element of the tuple
         for server_id in id_list:
-            if server_id[1] > uid:
+            if server_id[1] > uid:        # Send a request to the first server that have an ID higher than this
                 requests.post(server_id[0] + "/eleicao", json={"id": cur_election + '-' + str(uid)})
                 return
         # If we reached here, none servers have an ID higher than this, then, send to the lowest...
         # ... but check first if all of them failed...
-        valid_servers = 0
+        valid_servers = []
         for server_id in id_list:
             if server_id[1] > -1:
-                valid_servers += 1
-        if valid_servers == 0:      # ... since all of them failed, set ourselves as the new coordinator
+                valid_servers.append(server_id)
+        if len(valid_servers) == 0:      # ... since all of them failed, set ourselves as the new coordinator
             requests.post(acess_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
-        else:                       # ... otherwise, send a request to the lowest ID available
-            requests.post(id_list[0][0] + "/eleicao", json={"id": cur_election + '-' + str(uid)})
+        else:                            # ... otherwise, send a request to the lowest, valid ID available
+            requests.post(valid_servers[0][0] + "/eleicao", json={"id": cur_election + '-' + str(uid)})
     else:
         print(f"[DEBUG] Unknown election type: '{election_type}'")
 
@@ -348,6 +358,7 @@ def elec_anel(target, id_list, i):
             print(f"[DEBUG] Server '{target}' is using a different election type")
         else:
             id_list[i] = (target, target_info["identificacao"])
+            print(f"[DEBUG] Server '{target}' is valid")
             return
     except requests.ConnectionError:
         print(f"[DEBUG] Server '{target}' if offline")
@@ -358,7 +369,22 @@ def elec_anel(target, id_list, i):
     id_list[i] = (target, -1)
 
 
-def thr_func():
+def elec_timeout():
+    time.sleep(election_timeout)
+    if elect_running is True:
+        print("[DEBUG] Election timed out. Canceling...")
+        cancel_election()
+
+
+def cancel_election():
+    out = {
+        "id": str(cur_election)
+    }
+    requests.post(acess_point + '/eleicao/coordenador', json={"coordenador": -1, "id_eleicao": "canceled"})
+    return json.dumps(out), 200
+
+
+def make_busy():
     global is_busy
     print("[DEBUG] Thread fired, waiting 10s...")
     time.sleep(10)
