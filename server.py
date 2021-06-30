@@ -52,7 +52,7 @@ def coord_decision():
                 is_leader = req["coordenador"] == uid
                 if is_leader:
                     # print('[DEBUG] This server is the new coordinator')
-                    log(comment="This server is the new coordinator")
+                    log_success(comment="This server is the new coordinator")
                 # print(f"[DEBUG] Election '{cur_election}' ended")
                 log(comment=f"Election '{cur_election}' ended")
                 set_coord()
@@ -282,17 +282,29 @@ def enable_shadow():
     return "Shadow was enabled", 200
 
 
-def log_error(comment="Not Specified", body=None):
-    log(severity="Error", comment=comment, body=body)
+def log_success(comment="Not Specified", body=None):
+    log(severity="Success", comment=comment, body=body)
 
 
 def log_warning(comment="Not Specified", body=None):
     log(severity="Warning", comment=comment, body=body)
 
 
-def log(s_from=access_point, severity="Information", comment="Not Specified", body=None):
+def log_attention(comment="Not Specified", body=None):
+    log(severity="Attention", comment=comment, body=body)
+
+
+def log_error(comment="Not Specified", body=None):
+    log(severity="Error", comment=comment, body=body)
+
+
+def log_critical(comment="Not Specified", body=None):
+    log(severity="Critical", comment=comment, body=body)
+
+
+def log(s_from=None, severity="Information", comment="Not Specified", body=None):
     log_data = {
-        "from": s_from,
+        "from": (access_point if s_from is None else s_from),
         "severity": severity,
         "comment": comment,
         "body": body
