@@ -12,7 +12,7 @@ app = Flask(__name__)
 componente = "server"
 ver = "0.5"
 desc = "serve os clientes com servicos variados"
-acess_point = "https://sd-rdm.herokuapp.com"
+access_point = "https://sd-rdm.herokuapp.com"
 is_busy = False                                # If true, it's busy or 'down'. Otherwise, it's 'up'
 uid = 3
 is_leader = False
@@ -25,7 +25,7 @@ election_type = "anel"
 urls = ["https://sd-201620236.herokuapp.com", "https://sd-jhsq.herokuapp.com",
         "https://sd-mgs.herokuapp.com", "https://sd-app-server-jesulino.herokuapp.com",
         "https://sd-dmss.herokuapp.com"]
-log_url = "https://sd-log-server.herokuapp.com"
+log_url = "https://sd-log-server.herokuapp.com/log"
 
 is_shadow = False                           # If true, use the shadow servers for communication
 shadow_servers = ["https://sd-rdm-shadow1.herokuapp.com", "https://sd-rdm-shadow2.herokuapp.com"]
@@ -36,7 +36,7 @@ def reset():
     out = {
         "id": str(cur_election)
     }
-    requests.post(acess_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": "reset"})
+    requests.post(access_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": "reset"})
     return json.dumps(out), 200
 
 
@@ -102,7 +102,7 @@ def elected():
             ids = map(int, ids_str)             # Convert to numbers
             ids.sort()                          # Sort them
             if ids[-1] < uid:                   # Our id is higher, then, set ourselves as the new coordinator
-                requests.post(acess_point + '/eleicao/coordenador',
+                requests.post(access_point + '/eleicao/coordenador',
                               json={"coordenador": uid, "id_eleicao": cur_election})
             else:                               # But if not, search the server with this id and set it
                 for server in urls:
@@ -213,7 +213,7 @@ def d_set_info():
         "componente": componente,
         "versao": ver,
         "descricao": desc,
-        "ponto_de_acesso": acess_point,
+        "ponto_de_accesso": access_point,
         "status": ("down" if is_busy else "up"),
         "identificacao": uid,
         "lider": int(is_leader),
@@ -237,7 +237,7 @@ def info():
         "componente": componente,
         "versao": ver,
         "descricao": desc,
-        "ponto_de_acesso": acess_point,
+        "ponto_de_accesso": access_point,
         "status": ("down" if is_busy else "up"),
         "identificacao": uid,
         "lider": int(is_leader),
@@ -245,6 +245,37 @@ def info():
         "servidores_conhecidos": known_servers
     }
     return json.dumps(out), 200
+
+
+@app.route('/shadow', methods=['POST'])
+def enable_shadow():
+    global is_shadow
+    global urls
+    global access_point
+    global uid
+    is_shadow = True
+    req = request.json
+    try:
+        uid = req["id"]
+        access_point = req["access"]
+        urls = req["urls"]
+    except KeyError:    # If here, the caller is the main server
+        urls = shadow_servers
+    url_list = {
+        "urls": urls
+    }
+    log(s_from=access_point, comment=f"Shadow mode is ENABLED. URL list changed. UID: {uid}", body=url_list)
+    return "Shadow was enabled", 200
+
+
+def log(s_from="Unknown", severity="Information", comment="Not Specified", body=None):
+    log_data = {
+        "from": s_from,
+        "severity": severity,
+        "comment": comment,
+        "body": body
+    }
+    requests.post(log_url, json=log_data)
 
 
 def set_coord():
@@ -288,7 +319,7 @@ def run_election():
         for i in range(len(thr)):
             thr[i].join()
         if have_competition is False:   # No one opposed this server, set it as coordinator
-            requests.post(acess_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
+            requests.post(access_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
         else:
             print("[DEBUG] This server have competitors")
     elif election_type == "anel":
@@ -313,7 +344,7 @@ def run_election():
                 valid_servers.append(server_id)
         if len(valid_servers) == 0:      # ... since all of them failed, set ourselves as the new coordinator
             print("[DEBUG] There was no valid response from any server")
-            requests.post(acess_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
+            requests.post(access_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
         else:                            # ... otherwise, send a request to the lowest, valid ID available
             print(f"[DEBUG] Sending -{uid} to '{valid_servers[0][0]}'")
             requests.post(valid_servers[0][0] + "/eleicao", json={"id": cur_election + '-' + str(uid)})
@@ -377,7 +408,7 @@ def cancel_election():
     out = {
         "id": str(cur_election)
     }
-    requests.post(acess_point + '/eleicao/coordenador', json={"coordenador": -1, "id_eleicao": "canceled"})
+    requests.post(access_point + '/eleicao/coordenador', json={"coordenador": -1, "id_eleicao": "canceled"})
     return json.dumps(out), 200
 
 
