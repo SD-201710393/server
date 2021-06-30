@@ -117,7 +117,8 @@ def elected():
                         if new_coord["identificacao"] == ids[-1]:
                             requests.post(new_coord["ponto_de_accesso"] + "/eleicao/coordenador",
                                           json={"coordenador": ids[-1], "id_eleicao": cur_election})
-                            log(comment=f"'{new_coord['ponto_de_accesso'] }' Won ring election", body={"coordenador": ids[-1], "id_eleicao": cur_election})
+                            log(comment=f"'{new_coord['ponto_de_accesso'] }' Won ring election",
+                                body={"coordenador": ids[-1], "id_eleicao": cur_election})
                             break
                         elif new_coord["status"] == "down":
                             # print(f"[DEBUG] New Coordinator '{server}' became down")
