@@ -104,9 +104,8 @@ def elected():
             ids = []
             for num in ids_str[1:]:
                 ids.append(int(num))
-            ids.sort()  # Sort them
             ids.sort()                          # Sort them
-            if ids[-1] < uid:                   # Our id is higher, then, set ourselves as the new coordinator
+            if ids[-1] <= uid:                  # Our id is higher, then, set ourselves as the new coordinator
                 requests.post(access_point + '/eleicao/coordenador',
                               json={"coordenador": uid, "id_eleicao": cur_election})
                 log(comment="Won ring election", body={"coordenador": uid, "id_eleicao": cur_election})
