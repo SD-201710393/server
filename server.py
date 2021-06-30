@@ -107,13 +107,16 @@ def elected():
             if ids[-1] < uid:                   # Our id is higher, then, set ourselves as the new coordinator
                 requests.post(access_point + '/eleicao/coordenador',
                               json={"coordenador": uid, "id_eleicao": cur_election})
+                log(comment="Won ring election", body={"coordenador": uid, "id_eleicao": cur_election})
             else:                               # But if not, search the server with this id and set it
                 for server in urls:
                     try:
                         new_coord = requests.get(server + "/info").json()
-                        if new_coord["identificacao"] == uid:
-                            requests.post(new_coord + "/eleicao/coordenador",
+                        if new_coord["identificacao"] == ids[-1]:
+                            requests.post(new_coord["ponto_de_accesso"] + "/eleicao/coordenador",
                                           json={"coordenador": ids[-1], "id_eleicao": cur_election})
+                            log(comment=f"'{new_coord['ponto_de_accesso'] }' Won ring election", body={"coordenador": ids[-1], "id_eleicao": cur_election})
+                            break
                         elif new_coord["status"] == "down":
                             print(f"[DEBUG] New Coordinator '{server}' became down")
                     except requests.ConnectionError:
@@ -271,7 +274,7 @@ def enable_shadow():
     return "Shadow was enabled", 200
 
 
-def log(s_from="Unknown", severity="Information", comment="Not Specified", body=None):
+def log(s_from=access_point, severity="Information", comment="Not Specified", body=None):
     log_data = {
         "from": s_from,
         "severity": severity,
@@ -404,6 +407,7 @@ def elec_timeout():
     time.sleep(election_timeout)
     if elect_running is True:
         print("[DEBUG] Election timed out. Canceling...")
+        log(severity="Warning", comment="Election Timed out")
         cancel_election()
 
 
