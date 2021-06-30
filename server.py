@@ -99,7 +99,10 @@ def elected():
             # Only goes here if it's a ring election, it's ID is present and it started the election...
             # ... then we can finish it!
             ids_str = cur_election.split("-")   # Get all ids
-            ids = map(int, ids_str)             # Convert to numbers
+            ids = []
+            for num in ids_str[1:]:
+                ids.append(int(num))
+            ids.sort()  # Sort them
             ids.sort()                          # Sort them
             if ids[-1] < uid:                   # Our id is higher, then, set ourselves as the new coordinator
                 requests.post(access_point + '/eleicao/coordenador',
