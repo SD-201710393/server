@@ -44,6 +44,7 @@ def reset():
 @app.route('/eleicao/coordenador', methods=['POST'])      # Call this to say this server is a leader
 def coord_decision():
     global is_leader
+    global cur_election
     success = False
     req = request.json
     return_code: int
@@ -51,6 +52,8 @@ def coord_decision():
         if len(req) == 2:
             if req["id_eleicao"] != "canceled":
                 is_leader = req["coordenador"] == uid
+                if cur_election == "":
+                    cur_election = req["id_eleicao"]
                 if is_leader:
                     log_success(comment=f"This server is the new coordinator. Election '{cur_election}' ended",
                                 body=req)
@@ -97,6 +100,9 @@ def elected():
             elect_running = True
             if election_type == "anel" and ("-" not in cur_election):
                 started_ring = True
+            log(comment=f"Election started with id [{uid}] and mode '{election_type}'"
+                        f"{('and it started the rign' if started_ring and election_type == 'anel' else '')}",
+                body=cur_election)
             run_election()
             return_code = 200
         elif election_type == "anel" and ("-" + str(uid) in cur_election) and started_ring is True:
@@ -116,9 +122,9 @@ def elected():
                     try:
                         new_coord = requests.get(server + "/info").json()
                         if new_coord["identificacao"] == ids[-1]:
-                            requests.post(new_coord["ponto_de_accesso"] + "/eleicao/coordenador",
+                            requests.post(new_coord["ponto_de_acesso"] + "/eleicao/coordenador",
                                           json={"coordenador": ids[-1], "id_eleicao": cur_election})
-                            log(comment=f"'{new_coord['ponto_de_accesso'] }' Won ring election",
+                            log(comment=f"'{new_coord['ponto_de_acesso'] }' Won ring election",
                                 body={"coordenador": ids[-1], "id_eleicao": cur_election})
                             break
                         elif new_coord["status"] == "down":
@@ -228,7 +234,7 @@ def d_set_info():
         "componente": componente,
         "versao": ver,
         "descricao": desc,
-        "ponto_de_accesso": access_point,
+        "ponto_de_acesso": access_point,
         "status": ("down" if is_busy else "up"),
         "identificacao": uid,
         "lider": int(is_leader),
@@ -252,7 +258,7 @@ def info():
         "componente": componente,
         "versao": ver,
         "descricao": desc,
-        "ponto_de_accesso": access_point,
+        "ponto_de_acesso": access_point,
         "status": ("down" if is_busy else "up"),
         "identificacao": uid,
         "lider": int(is_leader),
