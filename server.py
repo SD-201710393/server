@@ -103,7 +103,7 @@ def elected():
                     started_ring = True
             log(comment=f"Election started with id [{uid}] and mode '{election_type}'"
                         f"{(' and it started the ring' if started_ring and election_type == 'anel' else '')}",
-                body=cur_election)
+                body=request.json)
             run_election(request.json)
             return_code = 200
         elif election_type == "anel" and started_ring is True:
@@ -423,8 +423,19 @@ def run_election(req_json):
             requests.post(access_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
         else:                            # ... otherwise, send a request to the lowest, valid ID available
             print(f"[DEBUG] Sending -{uid} to '{valid_servers[0][0]}'")
-            log(comment=f"Sending -{uid} to '{valid_servers[0][0]}'", body={"id": cur_election + '-' + str(uid)})
-            requests.post(valid_servers[0][0] + "/eleicao", json={"id": cur_election + '-' + str(uid)})
+            if 'participantes' in req_json:
+                part = req_json['participantes']
+                part.append(int(uid))
+                out = {
+                    "id": cur_election,
+                    "participantes": part
+                }
+            else:
+                out = {
+                    "id": cur_election + '-' + str(uid)
+                }
+            log(comment=f"Sending -{uid} to '{valid_servers[0][0]}'", body=out)
+            requests.post(valid_servers[0][0] + "/eleicao", json=out)
     else:
         print(f"[DEBUG] Unknown election type: '{election_type}'")
         log_attention(comment=f"Request an unknown election type: '{election_type}'")
