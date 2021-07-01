@@ -403,11 +403,12 @@ def run_election(req_json):
                         "id": cur_election,
                         "participantes": part
                     }
+                    log(comment=f"Adding {uid} to the list and sent to '{server_id[0]}'", body=out)
                 else:
                     out = {
                         "id": cur_election + '-' + str(uid)
                     }
-                log(comment=f"Sending -{uid} to '{server_id[0]}'", body=out)
+                    log(comment=f"Sending -{uid} to '{server_id[0]}'", body=out)
                 requests.post(server_id[0] + "/eleicao", json=out)
                 return
 
@@ -430,11 +431,12 @@ def run_election(req_json):
                     "id": cur_election,
                     "participantes": part
                 }
+                log(comment=f"Adding {uid} to the list and sent to '{valid_servers[0][0]}'", body=out)
             else:
                 out = {
                     "id": cur_election + '-' + str(uid)
                 }
-            log(comment=f"Sending -{uid} to '{valid_servers[0][0]}'", body=out)
+                log(comment=f"Sending -{uid} to '{valid_servers[0][0]}'", body=out)
             requests.post(valid_servers[0][0] + "/eleicao", json=out)
     else:
         print(f"[DEBUG] Unknown election type: '{election_type}'")
