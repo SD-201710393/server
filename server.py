@@ -13,7 +13,7 @@ app = Flask(__name__)
 componente = "Server"
 ver = "0.8"
 desc = "Serve os clientes com servicos variados"
-access_point = "https://sd-rdm.herokuapp.com"
+access_point = "http://localhost:5000"   # "https://sd-rdm.herokuapp.com"
 is_busy = False                                # If true, it's busy or 'down'. Otherwise, it's 'up'
 uid = 3
 is_leader = True
@@ -122,12 +122,14 @@ def elected():
                 print(f"[DEBUG] Election '{cur_election}' is still running")
                 log_attention(comment=f"Election '{cur_election}' is still running")
                 return json.dumps({"id": cur_election}), 409
+
             ids.sort()                          # Sort them
             if ids[-1] <= uid:                  # Our id is higher, then, set ourselves as the new coordinator
                 requests.post(access_point + '/eleicao/coordenador',
                               json={"coordenador": uid, "id_eleicao": cur_election})
                 log(comment="Won ring election", body={"coordenador": uid, "id_eleicao": cur_election})
             else:                               # But if not, search the server with this id and set it
+                new_coord = {}
                 for server in urls:
                     try:
                         new_coord = requests.get(server + "/info").json()
@@ -381,7 +383,7 @@ def run_election(req_json):
         else:
             print("[DEBUG] This server have competitors")
             log(comment=f"This server [{uid}] have competitors")
-    elif election_type == "anel":   # Ovos: 23/07
+    elif election_type == "anel":
         id_list = []
         for i in range(len(urls)):
             id_list.append((urls[i], -1))
@@ -407,6 +409,7 @@ def run_election(req_json):
                 log(comment=f"Sending -{uid} to '{server_id[0]}'", body=out)
                 requests.post(server_id[0] + "/eleicao", json=out)
                 return
+
         # If we reached here, none servers have an ID higher than this, then, send to the lowest...
         # ... but check first if all of them failed...
         valid_servers = []
@@ -431,6 +434,7 @@ def elec_valentao(target):
     # ... if it's id < your id
     global have_competition
     global cur_election
+    target_info = {}
     try:
         target_info = requests.get(target + "/info").json()
         if target_info["identificacao"] > uid:
@@ -459,6 +463,7 @@ def elec_valentao(target):
 
 
 def elec_anel(target, id_list, i):
+    target_info = {}
     try:
         target_info = requests.get(target + "/info").json()
         if target_info["status"] == "down":
