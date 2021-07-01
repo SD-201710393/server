@@ -98,8 +98,9 @@ def elected():
             return_code = 400
         elif elect_running is False:
             elect_running = True
-            if election_type == "anel" and ("-" not in cur_election):
-                started_ring = True
+            if election_type == "anel":
+                if "-" not in cur_election or 'participantes' in request.json and len(request.json['participantes']) == 0:
+                    started_ring = True
             log(comment=f"Election started with id [{uid}] and mode '{election_type}'"
                         f"{(' and it started the ring' if started_ring and election_type == 'anel' else '')}",
                 body=cur_election)
