@@ -103,15 +103,25 @@ def elected():
             log(comment=f"Election started with id [{uid}] and mode '{election_type}'"
                         f"{(' and it started the ring' if started_ring and election_type == 'anel' else '')}",
                 body=cur_election)
-            run_election()
+            run_election(request.json)
             return_code = 200
-        elif election_type == "anel" and ("-" + str(uid) in cur_election) and started_ring is True:
+        elif election_type == "anel" and started_ring is True:
             # Only goes here if it's a ring election, it's ID is present and it started the election...
-            # ... then we can finish it!
-            ids_str = cur_election.split("-")   # Get all ids
-            ids = []
-            for num in ids_str[1:]:
-                ids.append(int(num))
+            if 'participantes' in request.json and uid in request.json['participantes']:
+                # Starter is using the new method
+                ids = request.json['participantes']
+            elif "-" + str(uid) in cur_election:
+                # Starter is using the old method
+                log_attention(comment="Election starter doesn't have field 'participantes'. Using old method",
+                              body=request.json)
+                ids_str = cur_election.split("-")   # Get all ids
+                ids = []
+                for num in ids_str[1:]:
+                    ids.append(int(num))
+            else:
+                print(f"[DEBUG] Election '{cur_election}' is still running")
+                log_attention(comment=f"Election '{cur_election}' is still running")
+                return json.dumps({"id": cur_election}), 409
             ids.sort()                          # Sort them
             if ids[-1] <= uid:                  # Our id is higher, then, set ourselves as the new coordinator
                 requests.post(access_point + '/eleicao/coordenador',
@@ -353,7 +363,7 @@ def request_post_all(route, out_json):
         threading.Thread(target=(lambda: requests.post(u + route, json=out_json))).start()
 
 
-def run_election():
+def run_election(req_json):
     global elect_running
     global cur_election
     global have_competition
@@ -371,7 +381,7 @@ def run_election():
         else:
             print("[DEBUG] This server have competitors")
             log(comment=f"This server [{uid}] have competitors")
-    elif election_type == "anel":
+    elif election_type == "anel":   # Ovos: 23/07
         id_list = []
         for i in range(len(urls)):
             id_list.append((urls[i], -1))
@@ -383,8 +393,19 @@ def run_election():
         for server_id in id_list:
             if server_id[1] > uid:        # Send a request to the first server that have an ID higher than this
                 print(f"[DEBUG] Sending -{uid} to '{server_id[0]}'")
-                log(comment=f"Sending -{uid} to '{server_id[0]}'", body={"id": cur_election + '-' + str(uid)})
-                requests.post(server_id[0] + "/eleicao", json={"id": cur_election + '-' + str(uid)})
+                if 'participantes' in req_json:
+                    part = req_json['participantes']
+                    part.append(int(uid))
+                    out = {
+                        "id": cur_election,
+                        "participantes": part
+                    }
+                else:
+                    out = {
+                        "id": cur_election + '-' + str(uid)
+                    }
+                log(comment=f"Sending -{uid} to '{server_id[0]}'", body=out)
+                requests.post(server_id[0] + "/eleicao", json=out)
                 return
         # If we reached here, none servers have an ID higher than this, then, send to the lowest...
         # ... but check first if all of them failed...
