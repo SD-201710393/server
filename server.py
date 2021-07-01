@@ -101,7 +101,7 @@ def elected():
             if election_type == "anel" and ("-" not in cur_election):
                 started_ring = True
             log(comment=f"Election started with id [{uid}] and mode '{election_type}'"
-                        f"{('and it started the rign' if started_ring and election_type == 'anel' else '')}",
+                        f"{(' and it started the ring' if started_ring and election_type == 'anel' else '')}",
                 body=cur_election)
             run_election()
             return_code = 200
@@ -136,6 +136,9 @@ def elected():
                     except KeyError:
                         print(f"[DEBUG] Couldn't get info on New Coordinator '{server}'")
                         log_warning(comment=f"Couldn't get info on New Coordinator '{server}'")
+                    except TypeError:
+                        print("[DEBUG] Data type mismatch!")
+                        log_error(comment="Data type mismatch", body=new_coord)
             return_code = 200
         else:
             print(f"[DEBUG] Election '{cur_election}' is still running")
@@ -378,7 +381,7 @@ def run_election():
         for server_id in id_list:
             if server_id[1] > uid:        # Send a request to the first server that have an ID higher than this
                 print(f"[DEBUG] Sending -{uid} to '{server_id[0]}'")
-                log(comment=f"Sending -{uid} to '{server_id[0]}", body={"id": cur_election + '-' + str(uid)})
+                log(comment=f"Sending -{uid} to '{server_id[0]}'", body={"id": cur_election + '-' + str(uid)})
                 requests.post(server_id[0] + "/eleicao", json={"id": cur_election + '-' + str(uid)})
                 return
         # If we reached here, none servers have an ID higher than this, then, send to the lowest...
