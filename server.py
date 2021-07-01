@@ -122,10 +122,12 @@ def elected():
                     try:
                         new_coord = requests.get(server + "/info").json()
                         if new_coord["identificacao"] == ids[-1]:
-                            requests.post(new_coord["ponto_de_acesso"] + "/eleicao/coordenador",
+                            request_post_all("/eleicao/coordenador",
+                                             out_json={"coordenador": ids[-1], "id_eleicao": cur_election})
+                            requests.post(access_point + '/eleicao/coordenador',
                                           json={"coordenador": ids[-1], "id_eleicao": cur_election})
-                            log(comment=f"'{new_coord['ponto_de_acesso'] }' Won ring election",
-                                body={"coordenador": ids[-1], "id_eleicao": cur_election})
+                            log_success(comment=f"'{new_coord['ponto_de_acesso'] }' Won ring election",
+                                        body={"coordenador": ids[-1], "id_eleicao": cur_election})
                             break
                         elif new_coord["status"] == "down":
                             print(f"[DEBUG] New Coordinator '{server}' became down")
