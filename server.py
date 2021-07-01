@@ -2,6 +2,7 @@ import json
 import os
 import threading
 import time
+
 import requests
 from operator import itemgetter
 from flask import Flask
@@ -9,19 +10,19 @@ from flask import request
 
 app = Flask(__name__)
 # Server details that get pulled from '/info' in their respective order
-componente = "server"
-ver = "0.5"
-desc = "serve os clientes com servicos variados"
+componente = "Server"
+ver = "0.8"
+desc = "Serve os clientes com servicos variados"
 access_point = "https://sd-rdm.herokuapp.com"
 is_busy = False                                # If true, it's busy or 'down'. Otherwise, it's 'up'
 uid = 3
-is_leader = False
+is_leader = True
 have_competition = True                        # If true, at least one server have an UID higher than this
 elect_running = False
 started_ring = False                           # If true, this server started a 'ring election'
 election_timeout = 10                          # Timeout, in seconds, for an election to be canceled
 cur_election = ""
-election_type = "anel"
+election_type = "valentao"
 urls = ["https://sd-201620236.herokuapp.com", "https://sd-jhsq.herokuapp.com",
         "https://sd-mgs.herokuapp.com", "https://sd-app-server-jesulino.herokuapp.com",
         "https://sd-dmss.herokuapp.com"]
@@ -51,26 +52,27 @@ def coord_decision():
             if req["id_eleicao"] != "canceled":
                 is_leader = req["coordenador"] == uid
                 if is_leader:
-                    # print('[DEBUG] This server is the new coordinator')
-                    log_success(comment="This server is the new coordinator")
-                # print(f"[DEBUG] Election '{cur_election}' ended")
-                log(comment=f"Election '{cur_election}' ended")
+                    log_success(comment=f"This server is the new coordinator. Election '{cur_election}' ended",
+                                body=req)
+                else:
+                    log_success(comment=f"Election '{cur_election}' ended", body=req)
+                print(f"[DEBUG] Election '{cur_election}' ended")
                 set_coord()
                 success = True
                 return_code = 200
             else:
-                # print(f"[DEBUG] Election was canceled!")
-                log_warning(comment="Election was canceled!")
+                log_warning(comment="Election timed out and was canceled", body=req)
+                print(f"[DEBUG] Election was canceled!")
                 set_coord()
                 success = True
                 return_code = 200
         else:
-            # print("[DEBUG] Invalid coordinator request. Either invalid amount of arguments!")
-            log_warning(comment="Invalid Coordinator Request (Amount of Arguments)", body=req)
+            log_attention(comment="Invalid Coordinator Request (Amount of Arguments)", body=req)
+            print("[DEBUG] Invalid coordinator request. Either invalid amount of arguments!")
             return_code = 400
     except KeyError:
-        # print("[DEBUG] Invalid coordinator request. A required key is missing")
         log_error(comment="Invalid coordinator Request (Missing Key)", body=req)
+        print("[DEBUG] Invalid coordinator request. A required key is missing")
         success = False
         return_code = 400
     out = {
@@ -88,8 +90,8 @@ def elected():
     try:
         cur_election = request.json["id"]
         if cur_election is None:
-            # print("[DEBUG] Current Election id is NULL!")
             log_error(comment="Current Election id is NULL!", body=cur_election)
+            print("[DEBUG] Current Election id is NULL!")
             return_code = 400
         elif elect_running is False:
             elect_running = True
@@ -120,21 +122,21 @@ def elected():
                                 body={"coordenador": ids[-1], "id_eleicao": cur_election})
                             break
                         elif new_coord["status"] == "down":
-                            # print(f"[DEBUG] New Coordinator '{server}' became down")
+                            print(f"[DEBUG] New Coordinator '{server}' became down")
                             log_warning(comment=f"New Coordinator '{server}' became down")
                     except requests.ConnectionError:
-                        # print(f"[DEBUG] New Coordinator '{server}' became offline")
+                        print(f"[DEBUG] New Coordinator '{server}' became offline")
                         log_warning(comment=f"New Coordinator '{server}' became offline")
                     except KeyError:
-                        # print(f"[DEBUG] Couldn't get info on New Coordinator '{server}'")
+                        print(f"[DEBUG] Couldn't get info on New Coordinator '{server}'")
                         log_warning(comment=f"Couldn't get info on New Coordinator '{server}'")
             return_code = 200
         else:
-            # print(f"[DEBUG] Election '{cur_election}' is still running")
-            log_warning(comment=f"Election '{cur_election}' is still running")
+            print(f"[DEBUG] Election '{cur_election}' is still running")
+            log_attention(comment=f"Election '{cur_election}' is still running")
             return_code = 409   # Return 'conflict' if there is an election running
     except KeyError:
-        # print("[DEBUG] Key is missing")
+        print("[DEBUG] Key is missing")
         log_error(comment=f"Election '{cur_election}' is still running")
         return_code = 400
     out = {
@@ -220,7 +222,7 @@ def d_set_info():
 
     if return_code == 400:
         out["atencao"] = "Uma ou mais chaves invalidas"
-        # print("[DEBUG] One or more keys missing / invalid")
+        print("[DEBUG] One or more keys missing / invalid")
 
     curr_server_details = {
         "componente": componente,
@@ -308,7 +310,7 @@ def log(s_from=None, severity="Information", comment="Not Specified", body=None)
         "comment": comment,
         "body": body
     }
-    requests.post(log_url, json=log_data)
+    threading.Thread(target=(lambda: requests.post(log_url, json=log_data))).start()
 
 
 def set_coord():
@@ -327,14 +329,14 @@ def set_coord():
 
 
 def request_get_all(route, out_json):
-    # print(f"[DEBUG] Firing on all servers' [GET]  '{route}'")
+    print(f"[DEBUG] Firing on all servers' [GET]  '{route}'")
     log(comment=f"Firing @ [GET] '{route}' of all servers", body=out_json)
     for u in urls:
         threading.Thread(target=(lambda: requests.get(u + route, json=out_json))).start()
 
 
 def request_post_all(route, out_json):
-    # print(f"[DEBUG] Firing on all servers' [POST] '{route}'")
+    print(f"[DEBUG] Firing on all servers' [POST] '{route}'")
     log(comment=f"Firing @ [POST] '{route}' of all servers", body=out_json)
     for u in urls:
         threading.Thread(target=(lambda: requests.post(u + route, json=out_json))).start()
@@ -356,7 +358,7 @@ def run_election():
         if have_competition is False:   # No one opposed this server, set it as coordinator
             requests.post(access_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
         else:
-            # print("[DEBUG] This server have competitors")
+            print("[DEBUG] This server have competitors")
             log(comment=f"This server [{uid}] have competitors")
     elif election_type == "anel":
         id_list = []
@@ -369,8 +371,8 @@ def run_election():
         id_list.sort(key=itemgetter(1))   # Sort using the [1] element of the tuple
         for server_id in id_list:
             if server_id[1] > uid:        # Send a request to the first server that have an ID higher than this
-                # print(f"[DEBUG] Sending -{uid} to '{server_id[0]}'")
-                log(comment=f"Sending -{uid} to '{server_id[0]}")
+                print(f"[DEBUG] Sending -{uid} to '{server_id[0]}'")
+                log(comment=f"Sending -{uid} to '{server_id[0]}", body={"id": cur_election + '-' + str(uid)})
                 requests.post(server_id[0] + "/eleicao", json={"id": cur_election + '-' + str(uid)})
                 return
         # If we reached here, none servers have an ID higher than this, then, send to the lowest...
@@ -380,16 +382,16 @@ def run_election():
             if server_id[1] > -1:
                 valid_servers.append(server_id)
         if len(valid_servers) == 0:      # ... since all of them failed, set ourselves as the new coordinator
-            # print("[DEBUG] There was no valid response from any server")
+            print("[DEBUG] There was no valid response from any server")
             log_warning(comment="There was no valid response from any server")
             requests.post(access_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
         else:                            # ... otherwise, send a request to the lowest, valid ID available
-            # print(f"[DEBUG] Sending -{uid} to '{valid_servers[0][0]}'")
-            log(comment=f"Sending -{uid} to '{valid_servers[0][0]}'")
+            print(f"[DEBUG] Sending -{uid} to '{valid_servers[0][0]}'")
+            log(comment=f"Sending -{uid} to '{valid_servers[0][0]}'", body={"id": cur_election + '-' + str(uid)})
             requests.post(valid_servers[0][0] + "/eleicao", json={"id": cur_election + '-' + str(uid)})
     else:
-        # print(f"[DEBUG] Unknown election type: '{election_type}'")
-        log_warning(comment=f"Request an unknown election type: '{election_type}'")
+        print(f"[DEBUG] Unknown election type: '{election_type}'")
+        log_attention(comment=f"Request an unknown election type: '{election_type}'")
 
 
 def elec_valentao(target):
@@ -403,18 +405,25 @@ def elec_valentao(target):
             have_competition = True
             requests.post(target + "/eleicao", json={"id": cur_election})
             print("[DEBUG] Lost against '%s' [%d]" % (target, target_info["identificacao"]))
+            log(comment=f"Lost against '{target} [{target_info['identificacao']}]")
         elif target_info["status"] == "down":
             print(f"[DEBUG] Server '{target}' is down")
+            log_warning(comment=f"Server '{target}' is down")
         elif target_info["eleicao"] == "anel":
             print(f"[DEBUG] Server '{target}' is using a different election type")
+            log_warning(comment=f"Server '{target}' is using a different election type")
         else:
             print(f"[DEBUG] Won against '{target}'")
+            log(comment=f"Won against '{target}'")
     except requests.ConnectionError:
         print(f"[DEBUG] Server '{target}' if offline")
+        log_warning(comment=f"Server '{target}' is offline")
     except KeyError:
         print(f"[DEBUG] Couldn't get info on server '{target}'")
+        log_attention(comment=f"Couldn't get info on server '{target}'")
     except TypeError:
         print(f"[DEBUG] Server '{target}' sent data in an invalid format")
+        log_error(comment=f"Server '{target}' sent data in an invalid format", body=target_info)
 
 
 def elec_anel(target, id_list, i):
@@ -422,18 +431,23 @@ def elec_anel(target, id_list, i):
         target_info = requests.get(target + "/info").json()
         if target_info["status"] == "down":
             print(f"[DEBUG] Server '{target}' is down")
+            log_warning(comment=f"Server '{target}' is down")
         elif target_info["eleicao"] == "valentao":
             print(f"[DEBUG] Server '{target}' is using a different election type")
+            log_warning(comment=f"Server '{target}' is using a different election type")
         else:
             id_list[i] = (target, target_info["identificacao"])
             print(f"[DEBUG] Server '{target}' is valid")
             return
     except requests.ConnectionError:
         print(f"[DEBUG] Server '{target}' if offline")
+        log_warning(comment=f"Server '{target}' is offline")
     except KeyError:
         print(f"[DEBUG] Couldn't get info on server '{target}'")
+        log_attention(comment=f"Couldn't get info on server '{target}'")
     except TypeError:
         print(f"[DEBUG] Server '{target}' sent data in an invalid format")
+        log_error(comment=f"Server '{target}' sent data in an invalid format", body=target_info)
     id_list[i] = (target, -1)
 
 
@@ -441,7 +455,6 @@ def elec_timeout():
     time.sleep(election_timeout)
     if elect_running is True:
         print("[DEBUG] Election timed out. Canceling...")
-        log_warning(comment="Election Timed out")
         cancel_election()
 
 
