@@ -92,7 +92,6 @@ def elected():
     return_code: int
     try:
         cur_election = request.json["id"]
-        key_matcher = json.loads(request.json)   # Used for key matching
         if cur_election is None:
             log_error(comment="Current Election id is NULL!", body=cur_election)
             print("[DEBUG] Current Election id is NULL!")
@@ -100,7 +99,7 @@ def elected():
         elif elect_running is False:
             elect_running = True
             if election_type == "anel":
-                if "-" not in cur_election or ('participantes' in key_matcher and len(key_matcher['participantes']) == 0):
+                if "-" not in cur_election or ('participantes' in request.json and len(request.json['participantes']) == 0):
                     started_ring = True
             log(comment=f"Election started with id [{uid}] and mode '{election_type}'"
                         f"{(' and it started the ring' if started_ring and election_type == 'anel' else '')}",
@@ -109,7 +108,7 @@ def elected():
             return_code = 200
         elif election_type == "anel" and started_ring is True:
             # Only goes here if it's a ring election, it's ID is present and it started the election...
-            if 'participantes' in key_matcher and uid in key_matcher['participantes']:
+            if 'participantes' in request.json and uid in request.json['participantes']:
                 # Starter is using the new method
                 ids = request.json['participantes']
             elif "-" + str(uid) in cur_election:
@@ -373,7 +372,6 @@ def run_election(req_json):
     global have_competition
     have_competition = False
     thr = []
-    key_matcher = json.loads(request.json)  # Used for key matching
     threading.Thread(target=elec_timeout).start()   # If an election takes too long, cancel it
     if election_type == "valentao":
         for server in urls:
@@ -398,7 +396,7 @@ def run_election(req_json):
         for server_id in id_list:
             if server_id[1] > uid:        # Send a request to the first server that have an ID higher than this
                 print(f"[DEBUG] Sending -{uid} to '{server_id[0]}'")
-                if 'participantes' in key_matcher:
+                if 'participantes' in req_json:
                     part = req_json['participantes']
                     part.append(int(uid))
                     out = {
