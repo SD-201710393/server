@@ -303,7 +303,7 @@ def enable_shadow():
     url_list = {
         "urls": urls
     }
-    log(s_from=access_point, comment=f"Shadow mode is ENABLED. URL list changed. UID: {uid}", body=url_list)
+    log_attention(s_from=access_point, comment=f"Shadow mode is ENABLED. URL list changed. UID: {uid}", body=url_list)
     return "Shadow was enabled", 200
 
 
