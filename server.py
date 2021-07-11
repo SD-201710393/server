@@ -187,6 +187,7 @@ def res():
         if is_leader:
             is_busy = True
             threading.Thread(target=make_busy, args=()).start()
+            log_success(comment=f"Resource request was successful")
             return_code = 200
         else:
             leader = []
@@ -207,6 +208,7 @@ def res():
                     requests.post(leader[0] + '/recurso')
                     is_busy = True
                     threading.Thread(target=make_busy, args=()).start()
+                    log_success(comment=f"Resource request to '{leader[0]}' was successful")
                     return_code = 200
             elif leader_count == 0:
                 log_warning(comment="There is no leader in the network!")
