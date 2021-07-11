@@ -65,17 +65,14 @@ def coord_decision():
                 return_code = 200
             else:
                 log_warning(comment="Election timed out and was canceled", body=req)
-                print(f"[DEBUG] Election was canceled!")
                 set_coord()
                 success = True
                 return_code = 200
         else:
             log_attention(comment="Invalid Coordinator Request (Amount of Arguments)", body=req)
-            print("[DEBUG] Invalid coordinator request. Either invalid amount of arguments!")
             return_code = 400
     except KeyError:
         log_error(comment="Invalid coordinator Request (Missing Key)", body=req)
-        print("[DEBUG] Invalid coordinator request. A required key is missing")
         success = False
         return_code = 400
     out = {
@@ -94,7 +91,6 @@ def elected():
         cur_election = request.json["id"]
         if cur_election is None:
             log_error(comment="Current Election id is NULL!", body=cur_election)
-            print("[DEBUG] Current Election id is NULL!")
             return_code = 400
         elif elect_running is False:
             elect_running = True
@@ -120,7 +116,6 @@ def elected():
                 for num in ids_str[1:]:
                     ids.append(int(num))
             else:
-                print(f"[DEBUG] Election '{cur_election}' is still running")
                 log_attention(comment=f"Election '{cur_election}' is still running")
                 return json.dumps({"id": cur_election}), 409
 
@@ -143,24 +138,18 @@ def elected():
                                         body={"coordenador": ids[-1], "id_eleicao": cur_election})
                             break
                         elif new_coord["status"] == "down":
-                            print(f"[DEBUG] New Coordinator '{server}' became down")
                             log_warning(comment=f"New Coordinator '{server}' became down")
                     except requests.ConnectionError:
-                        print(f"[DEBUG] New Coordinator '{server}' became offline")
                         log_warning(comment=f"New Coordinator '{server}' became offline")
                     except KeyError:
-                        print(f"[DEBUG] Couldn't get info on New Coordinator '{server}'")
                         log_warning(comment=f"Couldn't get info on New Coordinator '{server}'")
                     except TypeError:
-                        print("[DEBUG] Data type mismatch!")
                         log_error(comment="Data type mismatch", body=new_coord)
             return_code = 200
         else:
-            print(f"[DEBUG] Election '{cur_election}' is still running")
             log_attention(comment=f"Election '{cur_election}' is still running")
             return_code = 409   # Return 'conflict' if there is an election running
     except KeyError:
-        print("[DEBUG] Key is missing")
         log_error(comment=f"Election '{cur_election}' is still running")
         return_code = 400
     out = {
@@ -383,14 +372,12 @@ def set_coord():
 
 
 def request_get_all(route, out_json):
-    print(f"[DEBUG] Firing on all servers' [GET]  '{route}'")
     log(comment=f"Firing @ [GET] '{route}' of all servers", body=out_json)
     for u in urls:
         threading.Thread(target=(lambda: requests.get(u + route, json=out_json))).start()
 
 
 def request_post_all(route, out_json):
-    print(f"[DEBUG] Firing on all servers' [POST] '{route}'")
     log(comment=f"Firing @ [POST] '{route}' of all servers", body=out_json)
     for u in urls:
         threading.Thread(target=(lambda: requests.post(u + route, json=out_json))).start()
@@ -412,7 +399,6 @@ def run_election(req_json):
         if have_competition is False:   # No one opposed this server, set it as coordinator
             requests.post(access_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
         else:
-            print("[DEBUG] This server have competitors")
             log(comment=f"This server [{uid}] have competitors")
     elif election_type == "anel":
         id_list = []
@@ -449,7 +435,6 @@ def run_election(req_json):
             if server_id[1] > -1:
                 valid_servers.append(server_id)
         if len(valid_servers) == 0:      # ... since all of them failed, set ourselves as the new coordinator
-            print("[DEBUG] There was no valid response from any server")
             log_warning(comment="There was no valid response from any server")
             requests.post(access_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
         else:                            # ... otherwise, send a request to the lowest, valid ID available
@@ -461,7 +446,7 @@ def run_election(req_json):
                     "id": cur_election,
                     "participantes": part
                 }
-                log(comment=f"Adding {uid} to the list and sent to '{valid_servers[0][0]}'", body=out)
+                log(comment=f"Adding {uid} to the list and sending to '{valid_servers[0][0]}'", body=out)
             else:
                 out = {
                     "id": cur_election + '-' + str(uid)
@@ -469,7 +454,6 @@ def run_election(req_json):
                 log(comment=f"Sending -{uid} to '{valid_servers[0][0]}'", body=out)
             requests.post(valid_servers[0][0] + "/eleicao", json=out)
     else:
-        print(f"[DEBUG] Unknown election type: '{election_type}'")
         log_attention(comment=f"Request an unknown election type: '{election_type}'")
 
 
@@ -484,25 +468,18 @@ def elec_valentao(target):
         if target_info["identificacao"] > uid:
             have_competition = True
             requests.post(target + "/eleicao", json={"id": cur_election})
-            print("[DEBUG] Lost against '%s' [%d]" % (target, target_info["identificacao"]))
             log(comment=f"Lost against '{target} [{target_info['identificacao']}]")
         elif target_info["status"] == "down":
-            print(f"[DEBUG] Server '{target}' is down")
             log_warning(comment=f"Server '{target}' is down")
         elif target_info["eleicao"] == "anel":
-            print(f"[DEBUG] Server '{target}' is using a different election type")
             log_warning(comment=f"Server '{target}' is using a different election type")
         else:
-            print(f"[DEBUG] Won against '{target}'")
             log(comment=f"Won against '{target}'")
     except requests.ConnectionError:
-        print(f"[DEBUG] Server '{target}' if offline")
         log_warning(comment=f"Server '{target}' is offline")
     except KeyError:
-        print(f"[DEBUG] Couldn't get info on server '{target}'")
         log_attention(comment=f"Couldn't get info on server '{target}'")
     except TypeError:
-        print(f"[DEBUG] Server '{target}' sent data in an invalid format")
         log_error(comment=f"Server '{target}' sent data in an invalid format", body=target_info)
 
 
@@ -511,23 +488,18 @@ def elec_anel(target, id_list, i):
     try:
         target_info = requests.get(target + "/info").json()
         if target_info["status"] == "down":
-            print(f"[DEBUG] Server '{target}' is down")
             log_warning(comment=f"Server '{target}' is down")
         elif target_info["eleicao"] == "valentao":
-            print(f"[DEBUG] Server '{target}' is using a different election type")
             log_warning(comment=f"Server '{target}' is using a different election type")
         else:
             id_list[i] = (target, target_info["identificacao"])
             print(f"[DEBUG] Server '{target}' is valid")
             return
     except requests.ConnectionError:
-        print(f"[DEBUG] Server '{target}' if offline")
         log_warning(comment=f"Server '{target}' is offline")
     except KeyError:
-        print(f"[DEBUG] Couldn't get info on server '{target}'")
         log_attention(comment=f"Couldn't get info on server '{target}'")
     except TypeError:
-        print(f"[DEBUG] Server '{target}' sent data in an invalid format")
         log_error(comment=f"Server '{target}' sent data in an invalid format", body=target_info)
     id_list[i] = (target, -1)
 
@@ -540,7 +512,9 @@ def find_leader():
             if int(t_data['lider']) == 1:
                 return t_data['identificacao']
         except requests.ConnectionError:
-            pass
+            log_warning(comment=f"'{server}' is unreachable")
+        except TypeError:
+            log_error(comment=f"'{server}' sent data in an invalid format")
     log_warning(comment="There is no leader in the network!")
     return -1
 
@@ -561,9 +535,9 @@ def query_resource(target, leader_list, faulty):
                 if response.status_code != 200:
                     faulty.append(target)
     except requests.ConnectionError:
-        pass
+        log_warning(comment=f"'{target}' is unreachable")
     except TypeError:
-        pass
+        log_error(comment=f"'{target}' sent data in an invalid format")
 
 
 def elec_timeout():
