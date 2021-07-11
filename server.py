@@ -16,7 +16,7 @@ desc = "Serve os clientes com servicos variados"
 access_point = "https://sd-rdm.herokuapp.com"
 is_busy = False                                # If true, it's busy or 'down'. Otherwise, it's 'up'
 uid = 3
-is_leader = True
+is_leader = False
 have_competition = True                        # If true, at least one server have an UID higher than this
 elect_running = False
 started_ring = False                           # If true, this server started a 'ring election'
@@ -180,23 +180,86 @@ def ack_election():
 
 @app.route('/recurso', methods=['GET'])                 # Call this to get the resource status
 def res_get():
-    server_res = {"ocupado": is_busy}
-    return json.dumps(server_res), 200
+    server_res = {
+        "ocupado": is_busy,
+        "id_lider": (uid if is_leader else find_leader())
+    }
+    return json.dumps(server_res), (409 if is_busy else 200)
 
 
 @app.route('/recurso', methods=['POST'])    # Call this to simulate handling a resource
 def res():
     global is_busy
     return_code: int
-    thr = threading.Thread(target=make_busy, args=())
     if is_busy:
         return_code = 409
     else:
-        is_busy = True
-        thr.start()
-        return_code = 200
+        if is_leader:
+            is_busy = True
+            threading.Thread(target=make_busy, args=()).start()
+            return_code = 200
+        else:
+            leader = []
+            faulty = []
+            thrs = []
+            for server in urls:
+                thrs.append(threading.Thread(target=query_resource, args=(server, leader, faulty)))
+                thrs[-1].start()
+            for thr in thrs:
+                thr.join()
+            leader_count = len(leader)
+            if leader_count == 1:
+                if len(faulty) > 0:
+                    for f in faulty:
+                        log_attention(comment=f"'{f}' didn't responded with code 200!")
+                    return_code = 409
+                else:
+                    requests.post(leader[0] + '/recurso')
+                    is_busy = True
+                    threading.Thread(target=make_busy, args=()).start()
+                    return_code = 200
+            elif leader_count == 0:
+                log_warning(comment="There is no leader in the network!")
+                return_code = 409
+            else:
+                log_warning(comment="There is more than 1 leader in the network")
+                return_code = 409
     server_res = {"ocupado": is_busy}
     return json.dumps(server_res), return_code
+
+
+def find_leader():
+    endpoint = '/info'
+    for server in urls:
+        try:
+            t_data = requests.get(server + endpoint).json()
+            if int(t_data['lider']) == 1:
+                return t_data['identificacao']
+        except requests.ConnectionError:
+            pass
+    log_warning(comment="There is no leader in the network!")
+    return -1
+
+
+def query_resource(target, leader_list, faulty):
+    endpoint1 = "/info"
+    endpoint2 = "/recurso"
+    try:
+        t_data = requests.get(target + endpoint1).json()
+        if t_data is None or t_data == {}:
+            # Nothing from this server
+            pass
+        else:
+            if int(t_data['lider']) == 1:
+                leader_list.append(target)
+            else:
+                response = requests.get(target + endpoint2)
+                if response.status_code != 200:
+                    faulty.append(target)
+    except requests.ConnectionError:
+        pass
+    except TypeError:
+        pass
 
 
 @app.route('/info', methods=['POST'])       # Call this to manually set info (DEBUG function)
@@ -303,7 +366,7 @@ def enable_shadow():
     url_list = {
         "urls": urls
     }
-    log_attention(s_from=access_point, comment=f"Shadow mode is ENABLED. URL list changed. UID: {uid}", body=url_list)
+    log_attention(comment=f"Shadow mode is ENABLED. URL list changed. UID: {uid}", body=url_list)
     return "Shadow was enabled", 200
 
 
@@ -519,8 +582,8 @@ def cancel_election():
 
 def make_busy():
     global is_busy
-    print("[DEBUG] Thread fired, waiting 10s...")
-    time.sleep(10)
+    print("[DEBUG] Thread fired, waiting 20s...")
+    time.sleep(20)
     print("[DEBUG] Thread ended")
     is_busy = False
 
