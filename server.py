@@ -192,6 +192,7 @@ def res():
     global is_busy
     return_code: int
     if is_busy:
+        log_warning(comment="This server is still busy")
         return_code = 409
     else:
         if is_leader:
@@ -226,40 +227,6 @@ def res():
                 return_code = 409
     server_res = {"ocupado": is_busy}
     return json.dumps(server_res), return_code
-
-
-def find_leader():
-    endpoint = '/info'
-    for server in urls:
-        try:
-            t_data = requests.get(server + endpoint).json()
-            if int(t_data['lider']) == 1:
-                return t_data['identificacao']
-        except requests.ConnectionError:
-            pass
-    log_warning(comment="There is no leader in the network!")
-    return -1
-
-
-def query_resource(target, leader_list, faulty):
-    endpoint1 = "/info"
-    endpoint2 = "/recurso"
-    try:
-        t_data = requests.get(target + endpoint1).json()
-        if t_data is None or t_data == {}:
-            # Nothing from this server
-            pass
-        else:
-            if int(t_data['lider']) == 1:
-                leader_list.append(target)
-            else:
-                response = requests.get(target + endpoint2)
-                if response.status_code != 200:
-                    faulty.append(target)
-    except requests.ConnectionError:
-        pass
-    except TypeError:
-        pass
 
 
 @app.route('/info', methods=['POST'])       # Call this to manually set info (DEBUG function)
@@ -563,6 +530,40 @@ def elec_anel(target, id_list, i):
         print(f"[DEBUG] Server '{target}' sent data in an invalid format")
         log_error(comment=f"Server '{target}' sent data in an invalid format", body=target_info)
     id_list[i] = (target, -1)
+
+
+def find_leader():
+    endpoint = '/info'
+    for server in urls:
+        try:
+            t_data = requests.get(server + endpoint).json()
+            if int(t_data['lider']) == 1:
+                return t_data['identificacao']
+        except requests.ConnectionError:
+            pass
+    log_warning(comment="There is no leader in the network!")
+    return -1
+
+
+def query_resource(target, leader_list, faulty):
+    endpoint1 = "/info"
+    endpoint2 = "/recurso"
+    try:
+        t_data = requests.get(target + endpoint1).json()
+        if t_data is None or t_data == {}:
+            # Nothing from this server
+            pass
+        else:
+            if int(t_data['lider']) == 1:
+                leader_list.append(target)
+            else:
+                response = requests.get(target + endpoint2)
+                if response.status_code != 200:
+                    faulty.append(target)
+    except requests.ConnectionError:
+        pass
+    except TypeError:
+        pass
 
 
 def elec_timeout():
