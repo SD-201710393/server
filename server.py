@@ -23,9 +23,9 @@ started_ring = False                           # If true, this server started a 
 election_timeout = 10                          # Timeout, in seconds, for an election to be canceled
 cur_election = ""
 election_type = "valentao"
-urls = ["https://sd-201620236.herokuapp.com", "https://sd-jhsq.herokuapp.com",
-        "https://sd-mgs.herokuapp.com", "https://sd-app-server-jesulino.herokuapp.com",
-        "https://sd-dmss.herokuapp.com"]
+urls = ["https://sd-jhsq.herokuapp.com", "https://sd-mgs.herokuapp.com",
+        "https://sd-app-server-jesulino.herokuapp.com", "https://sd-dmss.herokuapp.com"]
+# "https://sd-201620236.herokuapp.com" Saionara's server (currently disabled)
 log_url = "https://sd-log-server.herokuapp.com/log"
 
 is_shadow = False                           # If true, use the shadow servers for communication
@@ -506,6 +506,7 @@ def elec_anel(target, id_list, i):
 
 def find_leader():
     endpoint = '/info'
+    t_data = {}
     for server in urls:
         try:
             t_data = requests.get(server + endpoint).json()
@@ -522,6 +523,7 @@ def find_leader():
 def query_resource(target, leader_list, faulty):
     endpoint1 = "/info"
     endpoint2 = "/recurso"
+    t_data = {}
     try:
         t_data = requests.get(target + endpoint1).json()
         if t_data is None or t_data == {}:
