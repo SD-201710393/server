@@ -465,14 +465,14 @@ def elec_valentao(target):
     target_info = {}
     try:
         target_info = requests.get(target + "/info").json()
-        if target_info["identificacao"] > uid:
+        if target_info["eleicao"] == "anel":
+            log_warning(comment=f"Server '{target}' is using a different election type")
+        elif target_info["status"] == "down":
+            log_warning(comment=f"Server '{target}' is down")
+        elif target_info["identificacao"] > uid:
             have_competition = True
             requests.post(target + "/eleicao", json={"id": cur_election})
             log(comment=f"Lost against '{target} [{target_info['identificacao']}]")
-        elif target_info["status"] == "down":
-            log_warning(comment=f"Server '{target}' is down")
-        elif target_info["eleicao"] == "anel":
-            log_warning(comment=f"Server '{target}' is using a different election type")
         else:
             log(comment=f"Won against '{target}'")
     except requests.ConnectionError:
@@ -514,7 +514,7 @@ def find_leader():
         except requests.ConnectionError:
             log_warning(comment=f"'{server}' is unreachable")
         except TypeError:
-            log_error(comment=f"'{server}' sent data in an invalid format")
+            log_error(comment=f"'{server}' sent data in an invalid format", body=t_data)
     log_warning(comment="There is no leader in the network!")
     return -1
 
@@ -537,7 +537,7 @@ def query_resource(target, leader_list, faulty):
     except requests.ConnectionError:
         log_warning(comment=f"'{target}' is unreachable")
     except TypeError:
-        log_error(comment=f"'{target}' sent data in an invalid format")
+        log_error(comment=f"'{target}' sent data in an invalid format", body=t_data)
 
 
 def elec_timeout():
