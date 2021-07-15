@@ -46,7 +46,6 @@ def reset():
 def coord_decision():
     global is_leader
     global cur_election
-    global post_all_targets
     success = False
     req = request.json
     return_code: int
@@ -63,7 +62,6 @@ def coord_decision():
                     log_success(comment=f"Election '{cur_election}' ended", body=req)
                 print(f"[DEBUG] Election '{cur_election}' ended")
                 set_coord()
-                post_all_targets.clear()
                 success = True
                 return_code = 200
             else:
@@ -365,12 +363,14 @@ def set_coord():
     global elect_running
     global started_ring
     global cur_election
+    global post_all_targets
     if is_leader is True:
         out = {
             "coordenador": uid,
             "id_eleicao": cur_election
         }
         request_post_all("/eleicao/coordenador", out)
+    post_all_targets.clear()
     cur_election = ""
     elect_running = False
     started_ring = False
@@ -379,7 +379,7 @@ def set_coord():
 def request_get_all(route, out_json):
     out_all = {
         "election_info": out_json,
-        "tarets": post_all_targets
+        "targets": post_all_targets
     }
     log(comment=f"Firing @ [GET] '{route}' of all servers", body=out_all)
     for u in post_all_targets:
@@ -389,7 +389,7 @@ def request_get_all(route, out_json):
 def request_post_all(route, out_json):
     out_all = {
         "election_info": out_json,
-        "tarets": post_all_targets
+        "targets": post_all_targets
     }
     log(comment=f"Firing @ [POST] '{route}' of all valid servers", body=out_all)
     for u in post_all_targets:
@@ -400,7 +400,6 @@ def run_election(req_json):
     global elect_running
     global cur_election
     global have_competition
-    global post_all_targets
     have_competition = False
     thr = []
     threading.Thread(target=elec_timeout).start()   # If an election takes too long, cancel it
@@ -413,8 +412,7 @@ def run_election(req_json):
         if have_competition is False:   # No one opposed this server, set it as coordinator
             requests.post(access_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
         else:
-            log(comment=f"This server [{uid}] have competitors")
-            post_all_targets.clear()
+            log(comment="This server have competitors")
     elif election_type == "anel":
         id_list = []
         for i in range(len(urls)):
