@@ -25,6 +25,7 @@ cur_election = ""
 election_type = "valentao"
 urls = ["https://sd-jhsq.herokuapp.com", "https://sd-mgs.herokuapp.com",
         "https://sd-app-server-jesulino.herokuapp.com", "https://sd-dmss.herokuapp.com"]
+post_all_targets = []
 # "https://sd-201620236.herokuapp.com" Saionara's server (currently disabled)
 log_url = "https://sd-log-server.herokuapp.com/log"
 
@@ -45,6 +46,7 @@ def reset():
 def coord_decision():
     global is_leader
     global cur_election
+    global post_all_targets
     success = False
     req = request.json
     return_code: int
@@ -61,6 +63,7 @@ def coord_decision():
                     log_success(comment=f"Election '{cur_election}' ended", body=req)
                 print(f"[DEBUG] Election '{cur_election}' ended")
                 set_coord()
+                post_all_targets.clear()
                 success = True
                 return_code = 200
             else:
@@ -374,14 +377,22 @@ def set_coord():
 
 
 def request_get_all(route, out_json):
-    log(comment=f"Firing @ [GET] '{route}' of all servers", body=out_json)
-    for u in urls:
+    out_all = {
+        "election_info": out_json,
+        "tarets": post_all_targets
+    }
+    log(comment=f"Firing @ [GET] '{route}' of all servers", body=out_all)
+    for u in post_all_targets:
         threading.Thread(target=(lambda: requests.get(u + route, json=out_json))).start()
 
 
 def request_post_all(route, out_json):
-    log(comment=f"Firing @ [POST] '{route}' of all servers", body=out_json)
-    for u in urls:
+    out_all = {
+        "election_info": out_json,
+        "tarets": post_all_targets
+    }
+    log(comment=f"Firing @ [POST] '{route}' of all valid servers", body=out_all)
+    for u in post_all_targets:
         threading.Thread(target=(lambda: requests.post(u + route, json=out_json))).start()
 
 
@@ -389,6 +400,7 @@ def run_election(req_json):
     global elect_running
     global cur_election
     global have_competition
+    global post_all_targets
     have_competition = False
     thr = []
     threading.Thread(target=elec_timeout).start()   # If an election takes too long, cancel it
@@ -402,6 +414,7 @@ def run_election(req_json):
             requests.post(access_point + '/eleicao/coordenador', json={"coordenador": uid, "id_eleicao": cur_election})
         else:
             log(comment=f"This server [{uid}] have competitors")
+            post_all_targets.clear()
     elif election_type == "anel":
         id_list = []
         for i in range(len(urls)):
@@ -464,6 +477,7 @@ def elec_valentao(target):
     # ... if it's id < your id
     global have_competition
     global cur_election
+    global post_all_targets
     target_info = {}
     try:
         target_info = requests.get(target + "/info").json()
@@ -477,6 +491,7 @@ def elec_valentao(target):
             log(comment=f"Lost against '{target} [{target_info['identificacao']}]")
         else:
             log(comment=f"Won against '{target}'")
+            post_all_targets.append(target)     # Only add here, since if we lost, it's not our task to set a coord.
     except requests.ConnectionError:
         log_warning(comment=f"Server '{target}' is offline")
     except KeyError:
@@ -486,6 +501,7 @@ def elec_valentao(target):
 
 
 def elec_anel(target, id_list, i):
+    global post_all_targets
     target_info = {}
     try:
         target_info = requests.get(target + "/info").json()
@@ -496,6 +512,7 @@ def elec_anel(target, id_list, i):
         else:
             id_list[i] = (target, target_info["identificacao"])
             print(f"[DEBUG] Server '{target}' is valid")
+            post_all_targets.append(target)
             return
     except requests.ConnectionError:
         log_warning(comment=f"Server '{target}' is offline")
