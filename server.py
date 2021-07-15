@@ -11,7 +11,7 @@ from flask import request
 app = Flask(__name__)
 # Server details that get pulled from '/info' in their respective order
 componente = "Server"
-ver = "0.8"
+ver = "1.0.1"
 desc = "Serve os clientes com servicos variados"
 access_point = "https://sd-rdm.herokuapp.com"
 is_busy = False                                # If true, it's busy or 'down'. Otherwise, it's 'up'
