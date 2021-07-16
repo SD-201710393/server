@@ -59,7 +59,7 @@ def coord_decision():
                     log_success(comment=f"This server is the new coordinator. Election '{cur_election}' ended",
                                 body=req)
                 elif elect_running is False:
-                    log_warning(comment=f"Request to end election '{cur_election}' without an election running", body=req)
+                    log_warning(comment=f"Request to end election '{cur_election}' without an election running (Skipped because of low id?)", body=req)
                 else:
                     log_success(comment=f"Election '{cur_election}' ended", body=req)
                 print(f"[DEBUG] Election '{cur_election}' ended")
