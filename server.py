@@ -52,7 +52,7 @@ def coord_decision():
     try:
         if len(req) == 2:
             if req["id_eleicao"] != "canceled":
-                is_leader = req["coordenador"] == uid
+                is_leader = int(req["coordenador"]) == uid
                 if cur_election == "":
                     cur_election = req["id_eleicao"]
                 if is_leader:
